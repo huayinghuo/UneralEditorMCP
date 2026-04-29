@@ -242,6 +242,21 @@ UEdGraphPin* Pin = FindPin(Node, PinName, EGPD_Output); // or EGPD_Input
 - Python/Markdown/JSON: space 缩进
 - 所有文本文件 UTF-8 (无 BOM)
 
+### 4.4 Git push 被透明代理阻断
+
+**现象**: `git push` 报 `Recv failure: Connection was reset`。
+
+**原因**: 系统网络有透明代理拦截 HTTPS。
+
+**解决**: 推送时绕过代理：
+```powershell
+git -c http.proxy="" push origin master
+```
+
+- C++: `.editorconfig` 指定 CRLF, tab 缩进
+- Python/Markdown/JSON: space 缩进
+- 所有文本文件 UTF-8 (无 BOM)
+
 ---
 
 ## 5. 文件结构速查
