@@ -1,8 +1,24 @@
-"""MCP Tool Schema 注册表 —— 37 个 tool 的 action→（名称/描述/参数schema）映射
+"""MCP Tool Schema 注册表 —— 48 个 tool 的 action→（名称/描述/参数schema）映射
 
 C++ Handler 通过 get_mcp_config 暴露 action 列表，Python 端从此注册表取 schema，
 两者取交集生成最终 tool 列表，避免手工双写漂移。
+
+Bootstrap Config：UE 不在线时，Python 侧自举暴露最小配置，list_tools()
+与 call_tool("ue_get_mcp_config") 断连退化均来自此单一来源。
 """
+
+BOOTSTRAP_MCP_CONFIG = {
+    "version": "1.0.0",
+    "bridge_protocol": "TCP/JSON Lines",
+    "source": "python-bootstrap",
+    "connected": False,
+    "ue_version": None,
+    "mode": "development",
+    "token_enabled": False,
+    "actions": [
+        {"action": "get_mcp_config", "category": "Read", "mode": "development"},
+    ],
+}
 
 TOOL_SCHEMAS = {
     "ping": {
@@ -359,6 +375,32 @@ TOOL_SCHEMAS = {
             "properties": {
                 "asset_path": {"type": "string", "description": "Blueprint asset path"},
                 "save": {"type": "boolean", "description": "Also save to disk (default: false)"},
+            },
+            "required": ["asset_path"],
+        },
+    },
+    # ---- Blueprint Spec (Stage 11B) ----
+    "blueprint_apply_spec": {
+        "name": "ue_blueprint_apply_spec",
+        "description": "Create a Blueprint from a declarative spec (blueprint, nodes, edges). First pass: Actor Blueprint + EventGraph only.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "spec": {
+                    "type": "object",
+                    "description": "Blueprint spec: {blueprint: {name, parent_class}, nodes: [{id, type, event_name|function_name, params}], edges: [{from_node, from_pin, to_node, to_pin}]}"
+                },
+            },
+            "required": ["spec"],
+        },
+    },
+    "blueprint_export_spec": {
+        "name": "ue_blueprint_export_spec",
+        "description": "Export an existing Blueprint's EventGraph as a declarative spec (nodes, pins, edges)",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "asset_path": {"type": "string", "description": "Blueprint asset path to export"},
             },
             "required": ["asset_path"],
         },

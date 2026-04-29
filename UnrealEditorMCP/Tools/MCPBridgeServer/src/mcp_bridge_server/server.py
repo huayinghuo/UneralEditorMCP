@@ -14,7 +14,7 @@ from mcp.server.stdio import stdio_server
 import mcp.types as types
 
 from .bridge_client import UEBridgeClient
-from .tool_schemas import TOOL_SCHEMAS
+from .tool_schemas import TOOL_SCHEMAS, BOOTSTRAP_MCP_CONFIG
 
 logger = logging.getLogger(__name__)
 
@@ -32,29 +32,29 @@ class UEMCPServer:
         @self._server.list_tools()
         async def list_tools() -> list[types.Tool]:
             """动态生成 tool 列表：从 get_mcp_config 取 action ∩ 本地 schema 注册表"""
+            actions = None
             try:
                 result = await asyncio.to_thread(self._bridge.send, "get_mcp_config")
-                actions = result.get("result", {}).get("actions", [])
+                if result.get("ok"):
+                    actions = result.get("result", {}).get("actions")
             except Exception:
-                # UE 不在线时返回仅包含 get_mcp_config 的退化列表
-                return [
-                    types.Tool(
-                        name="ue_get_mcp_config",
-                        description="UE Editor not available — start Unreal Editor with MCP Bridge plugin loaded",
-                        inputSchema={"type": "object", "properties": {}, "required": []},
-                    )
-                ]
+                pass
+
+            if not actions:
+                actions = BOOTSTRAP_MCP_CONFIG.get("actions", [])
 
             tools = []
             for entry in actions:
-                action_name = entry["action"]
+                action_name = entry.get("action")
+                if not action_name:
+                    continue
                 schema = TOOL_SCHEMAS.get(action_name)
                 if schema is None:
-                    logger.warning("Action '%s' in C++ registry but missing from Python TOOL_SCHEMAS", action_name)
+                    logger.warning("Action '%s' in registry but missing from Python TOOL_SCHEMAS", action_name)
                     continue
                 tools.append(types.Tool(**schema))
 
-            logger.info("Generated %d tools from C++ registry (%d actions total)", len(tools), len(actions))
+            logger.info("Generated %d tools (%d actions available)", len(tools), len(actions))
             self._cached_tools = tools
             return tools
 
@@ -66,15 +66,20 @@ class UEMCPServer:
                 action = name.replace("ue_", "", 1)
 
                 # 全部参数直接作为 payload 透传（_token 除外）
-                payload = dict(arguments)
+                payload = dict(arguments or {})
 
                 result = await asyncio.to_thread(self._bridge.send, action, payload)
 
                 if result.get("ok"):
+                    response_data = result["result"]
+                    if action == "get_mcp_config":
+                        response_data["source"] = "ue-live"
+                        response_data["connected"] = True
+                        response_data["schema_registry_count"] = len(TOOL_SCHEMAS)
                     return [
                         types.TextContent(
                             type="text",
-                            text=json.dumps(result["result"], indent=2, ensure_ascii=False),
+                            text=json.dumps(response_data, indent=2, ensure_ascii=False),
                         )
                     ]
                 else:
@@ -88,6 +93,13 @@ class UEMCPServer:
                         )
                     ]
             except ConnectionError as e:
+                if name == "ue_get_mcp_config":
+                    return [
+                        types.TextContent(
+                            type="text",
+                            text=json.dumps(BOOTSTRAP_MCP_CONFIG, indent=2, ensure_ascii=False),
+                        )
+                    ]
                 return [
                     types.TextContent(
                         type="text",

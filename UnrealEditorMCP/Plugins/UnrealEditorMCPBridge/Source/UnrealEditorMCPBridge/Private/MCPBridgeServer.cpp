@@ -10,6 +10,7 @@
 #include "Handlers/MCPWidgetHandlers.h"
 #include "Handlers/MCPDirtyHandlers.h"
 #include "Handlers/MCPBlueprintGraphHandlers.h"
+#include "Handlers/MCPBlueprintSpecHandlers.h"
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonWriter.h"
@@ -78,6 +79,9 @@ void FMCPBridgeServer::RegisterHandlers()
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPBlueprintAddCallFunctionNodeHandler()));
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPBlueprintConnectPinsHandler()));
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPCompileSaveBlueprintHandler()));
+	// Blueprint Spec 编辑（2 个）
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPApplyBlueprintSpecHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPExportBlueprintSpecHandler()));
 	// Viewport（1 个）
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPViewportScreenshotHandler()));
 	// Material（5 个）

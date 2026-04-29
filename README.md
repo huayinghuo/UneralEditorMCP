@@ -16,7 +16,7 @@ Unreal Engine 5.3 Editor
 
 **传输层可替换**，当前使用本地 TCP + 外部 Python Server，后续可评估 HTTP/SSE。
 
-## 能力清单（46 Handler）
+## 能力清单（48 Handler）
 
 ### 编辑器状态（6）
 | 工具 | 说明 |
@@ -71,6 +71,21 @@ Unreal Engine 5.3 Editor
 | `ue_material_set_vector_param` | 设置 MaterialInstance 向量/颜色参数 |
 | `ue_material_set_texture_param` | 设置 MaterialInstance 纹理参数 |
 
+### Blueprint 图编辑（8）
+| 工具 | 说明 |
+|------|------|
+| `ue_blueprint_create_actor_class` | 创建 Actor Blueprint 类 |
+| `ue_blueprint_get_event_graph_info` | 获取 EventGraph 结构信息 |
+| `ue_blueprint_add_event_node` | 添加/复用事件节点 |
+| `ue_blueprint_add_call_function_node` | 添加 CallFunction 节点 |
+| `ue_blueprint_connect_pins` | 连接引脚 |
+| `ue_blueprint_compile_save` | 编译 Blueprint（可选保存） |
+| `ue_blueprint_apply_spec` | 从声明式 spec JSON 创建 BP 图（事件+函数+连线），**不自动编译**，需后续调用 `compile_save` 验证 |
+| `ue_blueprint_export_spec` | 导出已有 BP 的 EventGraph 为 spec |
+
+### 10C：离断链自举
+Python MCP Server 在 UE 未连接时返回 `BOOTSTRAP_MCP_CONFIG`（`source=python-bootstrap`），UE 在线后自动切换为 live config（`source=ue-live`），断连后退化回 bootstrap。`list_tools` 与 `ue_get_mcp_config` 离线结果共用同一配置源。
+
 ### 事务控制（4）
 | 工具 | 说明 |
 |------|------|
@@ -101,14 +116,14 @@ UnrealEditorMCP/                    ← Git 仓库根目录
 │   │   ├── Config/                      # ini 配置（Token/Port）
 │   │   ├── Source/UnrealEditorMCPBridge/
 │   │   │   ├── Public/                  # Handler 接口、调度器、Helpers
-│   │   │   │   └── Handlers/            # 10 个领域文件（46 Handler）
+│   │   │   │   └── Handlers/            # 11 个领域文件（48 Handler）
 │   │   │   └── Private/                 # 实现
 │   │   └── Resources/
 │   ├── Tools/MCPBridgeServer/           # Python MCP Server
 │   │   ├── src/mcp_bridge_server/
 │   │   │   ├── server.py                # MCP 入口
 │   │   │   ├── bridge_client.py         # TCP 客户端
-│   │   │   └── tool_schemas.py          # 46 tool schema 注册表
+│   │   │   └── tool_schemas.py          # 48 tool schema 注册表
 │   │   └── tests/
 │   └── .ai/                             # 项目治理（plan / log / dev）
 └── Config/                              # 项目工程配置

@@ -206,7 +206,13 @@ namespace MCPBlueprintGraphHelpers
 
 		FBlueprintEditorUtils::MarkBlueprintAsModified(CastChecked<UBlueprint>(Graph->GetOuter()));
 
-		return Schema->TryCreateConnection(SourcePin, TargetPin);
+		bool bConnected = Schema->TryCreateConnection(SourcePin, TargetPin);
+		if (!bConnected)
+		{
+			OutErrorCode = TEXT("CONNECTION_REJECTED");
+			OutErrorMessage = FString::Printf(TEXT("Schema rejected connection: '%s.%s' -> '%s.%s'"), *SourcePinName, *SourcePin->PinType.PinCategory.ToString(), *TargetPinName, *TargetPin->PinType.PinCategory.ToString());
+		}
+		return bConnected;
 	}
 
 	bool CompileBlueprint(UBlueprint* BP, FString& OutErrorCode, FString& OutErrorMessage)

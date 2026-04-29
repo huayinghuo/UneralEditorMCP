@@ -23,6 +23,9 @@ function Send-Request($action, $payload) {
 
 $log = @()
 
+$ts = Get-Date -Format "HHmmss"
+$bpName = "TestBPA_Stage11A_$ts"
+
 Start-Sleep -Milliseconds 500
 
 # 1. ping
@@ -30,7 +33,7 @@ $r = Send-Request "ping"
 $log += "1. ping: ok=$($r.ok)"
 
 # 2. blueprint_create_actor_class
-$r = Send-Request "blueprint_create_actor_class" @{ name = "TestBPA_Stage11A"; parent_class = "Actor" }
+$r = Send-Request "blueprint_create_actor_class" @{ name = $bpName; parent_class = "Actor" }
 $log += "2. create_actor_bp: ok=$($r.ok)"
 if ($r.ok) {
     $bpPath = $r.result.asset_path
