@@ -1,0 +1,51 @@
+* text=auto
+
+*.cpp text eol=crlf
+*.h text eol=crlf
+*.cs text eol=crlf
+*.c text eol=crlf
+*.hpp text eol=crlf
+
+*.py text eol=lf
+*.sh text eol=lf
+
+*.md text eol=crlf
+*.json text eol=crlf
+*.ini text eol=crlf
+*.txt text eol=crlf
+*.yaml text eol=crlf
+*.yml text eol=crlf
+*.xml text eol=crlf
+
+*.uasset binary
+*.umap binary
+*.uexp binary
+*.ubulk binary
+*.uptnl binary
+*.uplugin binary
+*.uproject binary
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.bmp binary
+*.tga binary
+*.dds binary
+*.ico binary
+*.icns binary
+
+*.dll binary
+*.pdb binary
+*.lib binary
+*.exe binary
+*.so binary
+*.dylib binary
+
+*.fbx binary
+*.obj binary
+*.blend binary
+*.3ds binary
+
+*.wav binary
+*.mp3 binary
+*.ogg binary

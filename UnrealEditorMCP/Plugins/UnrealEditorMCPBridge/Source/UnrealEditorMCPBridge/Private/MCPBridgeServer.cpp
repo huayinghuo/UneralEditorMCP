@@ -1,0 +1,394 @@
+#include "MCPBridgeServer.h"
+#include "Handlers/MCPQueryHandlers.h"
+#include "Handlers/MCPActorHandlers.h"
+#include "Handlers/MCPPythonHandler.h"
+#include "Handlers/MCPWriteHandlers.h"
+#include "Handlers/MCPTransactionHandlers.h"
+#include "Handlers/MCPBlueprintHandlers.h"
+#include "Handlers/MCPViewportHandlers.h"
+#include "Handlers/MCPMaterialHandlers.h"
+#include "Handlers/MCPWidgetHandlers.h"
+#include "Handlers/MCPDirtyHandlers.h"
+#include "Handlers/MCPBlueprintGraphHandlers.h"
+#include "Serialization/JsonSerializer.h"
+#include "Serialization/JsonReader.h"
+#include "Serialization/JsonWriter.h"
+#include "Dom/JsonObject.h"
+#include "HAL/PlatformProcess.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogMCPBridgeServer, Log, All);
+
+static const int32 DefaultBridgePort = 9876;
+
+FMCPBridgeServer::FMCPBridgeServer()
+	: ListenerSocket(nullptr)
+	, ClientSocket(nullptr)
+	, Thread(nullptr)
+	, bStopping(false)
+	, ServerPort(DefaultBridgePort)
+	, ServerStatus(EMCPBridgeServerStatus::Unstarted)
+{
+	RegisterHandlers();
+}
+
+FMCPBridgeServer::~FMCPBridgeServer()
+{
+	Stop();
+}
+
+void FMCPBridgeServer::RegisterHandlers()
+{
+	// 查询类（7 个）
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPPingHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPGetEditorInfoHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPGetProjectInfoHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPGetWorldStateHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPListAssetsHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPGetAssetInfoHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPGetMCPConfigHandler(this)));
+	// Actor 类（4 个）
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPGetSelectedActorsHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPListLevelActorsHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPGetActorPropertyHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPGetComponentPropertyHandler()));
+	// Python（1 个）
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPExecutePythonHandler()));
+	// 写操作（6 个）
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPSpawnActorHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPLevelSetActorTransformHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPActorSetPropertyHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPSaveCurrentLevelHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPDeleteActorHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPSetComponentPropertyHandler()));
+	// 事务（4 个）
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPBeginTransactionHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPEndTransactionHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPUndoHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPRedoHandler()));
+	// Blueprint（5 个）
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPListBlueprintsHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPGetBlueprintInfoHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPCreateBlueprintHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPAddBlueprintVariableHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPAddBlueprintFunctionHandler()));
+	// Blueprint Graph 编辑（6 个）
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPCreateActorBlueprintClassHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPGetBlueprintEventGraphInfoHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPBlueprintAddEventNodeHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPBlueprintAddCallFunctionNodeHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPBlueprintConnectPinsHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPCompileSaveBlueprintHandler()));
+	// Viewport（1 个）
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPViewportScreenshotHandler()));
+	// Material（5 个）
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPListMaterialsHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPGetMaterialInfoHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPSetMaterialScalarParamHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPSetMaterialVectorParamHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPSetMaterialTextureParamHandler()));
+	// Widget（6 个）
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPListWidgetsHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPGetWidgetInfoHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPCreateWidgetBlueprintHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPWidgetAddChildHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPWidgetRemoveChildHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPWidgetSetPropertyHandler()));
+	// Dirty（1 个）
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPGetDirtyPackagesHandler()));
+}
+
+bool FMCPBridgeServer::Start(int32 Port)
+{
+	ServerPort = Port;
+	bStopping = false;
+	Thread = FRunnableThread::Create(this, TEXT("MCPBridgeServer"), 0, TPri_Normal);
+	return Thread != nullptr;
+}
+
+void FMCPBridgeServer::Stop()
+{
+	if (bStopping) return;
+	bStopping = true;
+	ServerStatus = EMCPBridgeServerStatus::Stopped;  // 标记停止
+
+	if (Thread)
+	{
+		Thread->WaitForCompletion();
+		delete Thread;
+		Thread = nullptr;
+	}
+
+	FScopeLock Lock(&ClientSocketCS);
+	if (ClientSocket)
+	{
+		ClientSocket->Close();
+		ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->DestroySocket(ClientSocket);
+		ClientSocket = nullptr;
+	}
+
+	if (ListenerSocket)
+	{
+		ListenerSocket->Close();
+		ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->DestroySocket(ListenerSocket);
+		ListenerSocket = nullptr;
+	}
+}
+
+bool FMCPBridgeServer::Init()
+{
+	return true;
+}
+
+uint32 FMCPBridgeServer::Run()
+{
+	ISocketSubsystem* SocketSubsystem = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM);
+	if (!SocketSubsystem)
+	{
+		UE_LOG(LogMCPBridgeServer, Error, TEXT("Failed to get socket subsystem"));
+		return 1;
+	}
+
+	ListenerSocket = SocketSubsystem->CreateSocket(NAME_Stream, TEXT("MCPBridgeListener"), false);
+	if (!ListenerSocket)
+	{
+		UE_LOG(LogMCPBridgeServer, Error, TEXT("Failed to create listener socket"));
+		return 1;
+	}
+
+	ListenerSocket->SetNonBlocking(true);
+	ListenerSocket->SetReuseAddr(true);
+
+	FIPv4Address BindAddr(127, 0, 0, 1);
+	FIPv4Endpoint Endpoint(BindAddr, ServerPort);
+
+	if (!ListenerSocket->Bind(*Endpoint.ToInternetAddr()))
+	{
+		UE_LOG(LogMCPBridgeServer, Error, TEXT("Failed to bind to %s:%d"), *BindAddr.ToString(), ServerPort);
+		ServerStatus = EMCPBridgeServerStatus::Error;
+		return 1;
+	}
+
+	if (!ListenerSocket->Listen(1))
+	{
+		UE_LOG(LogMCPBridgeServer, Error, TEXT("Failed to listen on port %d"), ServerPort);
+		return 1;
+	}
+
+	UE_LOG(LogMCPBridgeServer, Log, TEXT("MCP Bridge listening on 127.0.0.1:%d"), ServerPort);
+	ServerStatus = EMCPBridgeServerStatus::Listening;  // Bind+Listen 成功，服务就绪
+
+	FString ReadBuffer;
+
+	while (!bStopping)
+	{
+		FSocket* ActiveClient = nullptr;
+		{
+			FScopeLock Lock(&ClientSocketCS);
+			ActiveClient = ClientSocket;
+		}
+
+		bool bHasPendingConnection = false;
+		if (!ActiveClient && ListenerSocket->HasPendingConnection(bHasPendingConnection) && bHasPendingConnection)
+		{
+			TSharedRef<FInternetAddr> RemoteAddr = SocketSubsystem->CreateInternetAddr();
+			FScopeLock Lock(&ClientSocketCS);
+			ClientSocket = ListenerSocket->Accept(*RemoteAddr, TEXT("MCPBridgeClient"));
+			if (ClientSocket)
+			{
+				UE_LOG(LogMCPBridgeServer, Log, TEXT("Client connected from %s"), *RemoteAddr->ToString(true));
+				ServerStatus = EMCPBridgeServerStatus::Connected;  // 客户端已连接
+				ReadBuffer.Empty();
+			}
+			{
+				FScopeLock Lock2(&ClientSocketCS);
+				ActiveClient = ClientSocket;
+			}
+		}
+
+		if (ActiveClient)
+		{
+			uint8 Buffer[4096];
+			int32 BytesRead = 0;
+
+			if (ActiveClient->Wait(ESocketWaitConditions::WaitForRead, FTimespan::FromMilliseconds(50)))
+			{
+				if (ActiveClient->Recv(Buffer, sizeof(Buffer) - 1, BytesRead) && BytesRead > 0)
+				{
+					Buffer[BytesRead] = '\0';
+					ReadBuffer += UTF8_TO_TCHAR(Buffer);
+				}
+				else if (BytesRead == 0)
+				{
+					UE_LOG(LogMCPBridgeServer, Log, TEXT("Client disconnected (zero bytes read)"));
+					FScopeLock Lock(&ClientSocketCS);
+					if (ClientSocket)
+					{
+						ClientSocket->Close();
+						SocketSubsystem->DestroySocket(ClientSocket);
+						ClientSocket = nullptr;
+					}
+					ReadBuffer.Empty();
+					ServerStatus = EMCPBridgeServerStatus::Listening;
+					MCPTransaction_AutoEndIfActive();
+					// 丢弃旧连接的全部残留队列
+					FMCPPendingRequest DummyReq;
+					while (RequestQueue.Dequeue(DummyReq)) {}
+					FMCPPendingResponse DummyResp;
+					while (ResponseQueue.Dequeue(DummyResp)) {}
+				}
+			}
+
+			int32 NewlinePos;
+			while (ReadBuffer.FindChar(TEXT('\n'), NewlinePos))
+			{
+				FString Line = ReadBuffer.Left(NewlinePos).TrimStartAndEnd();
+				ReadBuffer.RightChopInline(NewlinePos + 1);
+
+				if (Line.IsEmpty())
+				{
+					continue;
+				}
+
+				TSharedPtr<FJsonObject> JsonObject;
+				TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Line);
+
+				if (FJsonSerializer::Deserialize(Reader, JsonObject) && JsonObject.IsValid())
+				{
+					FString Id;
+					JsonObject->TryGetStringField(TEXT("id"), Id);
+
+					FString Action;
+					JsonObject->TryGetStringField(TEXT("action"), Action);
+
+					const TSharedPtr<FJsonObject>* PayloadPtr = nullptr;
+					TSharedPtr<FJsonObject> Payload;
+					if (JsonObject->TryGetObjectField(TEXT("payload"), PayloadPtr))
+					{
+						Payload = *PayloadPtr;
+					}
+
+					if (Action.IsEmpty())
+					{
+						FMCPPendingResponse Resp;
+						Resp.Id = Id;
+						Resp.bOk = false;
+						Resp.ErrorCode = TEXT("MISSING_ACTION");
+						Resp.ErrorMessage = TEXT("Action field is required");
+						SendResponse(ActiveClient, Resp);
+					}
+					else
+					{
+						FMCPPendingRequest Request;
+						Request.Id = Id;
+						Request.Action = Action;
+						Request.Payload = Payload;
+						RequestQueue.Enqueue(Request);
+					}
+				}
+				else
+				{
+					UE_LOG(LogMCPBridgeServer, Warning, TEXT("Failed to parse JSON line"));
+					FMCPPendingResponse Resp;
+					Resp.Id = TEXT("");
+					Resp.bOk = false;
+					Resp.ErrorCode = TEXT("PARSE_ERROR");
+					Resp.ErrorMessage = TEXT("Invalid JSON");
+					SendResponse(ActiveClient, Resp);
+				}
+			}
+
+			FMCPPendingResponse Resp;
+			while (ResponseQueue.Dequeue(Resp))
+			{
+				SendResponse(ActiveClient, Resp);
+			}
+		}
+
+		FPlatformProcess::Sleep(0.01f);
+	}
+
+	return 0;
+}
+
+void FMCPBridgeServer::Exit()
+{
+}
+
+EMCPBridgeServerStatus FMCPBridgeServer::GetStatus() const
+{
+	return ServerStatus;
+}
+
+bool FMCPBridgeServer::IsListening() const
+{
+	EMCPBridgeServerStatus Status = GetStatus();
+	return Status == EMCPBridgeServerStatus::Listening || Status == EMCPBridgeServerStatus::Connected;
+}
+
+void FMCPBridgeServer::ProcessPendingRequests()
+{
+	// 从请求队列中取出所有待处理请求，通过 Dispatcher 表驱动分发
+	FMCPPendingRequest Request;
+	int32 ProcessedCount = 0;
+	while (RequestQueue.Dequeue(Request))
+	{
+		TSharedPtr<FJsonObject> ResultObj;
+		FString ErrorCode, ErrorMessage;
+		bool bOk = Dispatcher.Dispatch(Request.Action, Request.Payload, ResultObj, ErrorCode, ErrorMessage);
+
+		FMCPPendingResponse Response;
+		Response.Id = Request.Id;
+		Response.bOk = bOk;
+		Response.ResultObj = ResultObj;
+		Response.ErrorCode = ErrorCode;
+		Response.ErrorMessage = ErrorMessage;
+		ResponseQueue.Enqueue(Response);
+		ProcessedCount++;
+	}
+
+	if (ProcessedCount > 0)
+	{
+		UE_LOG(LogMCPBridgeServer, Verbose, TEXT("Processed %d requests on game thread"), ProcessedCount);
+	}
+}
+
+bool FMCPBridgeServer::SendResponse(FSocket* Client, const FMCPPendingResponse& Response)
+{
+	if (!Client)
+	{
+		return false;
+	}
+
+	TSharedPtr<FJsonObject> ResponseObj = MakeShareable(new FJsonObject());
+	ResponseObj->SetStringField(TEXT("id"), Response.Id);
+	ResponseObj->SetBoolField(TEXT("ok"), Response.bOk);
+
+	if (Response.bOk && Response.ResultObj.IsValid())
+	{
+		ResponseObj->SetField(TEXT("result"), MakeShareable(new FJsonValueObject(Response.ResultObj)));
+		ResponseObj->SetField(TEXT("error"), MakeShareable(new FJsonValueNull()));
+	}
+	else if (Response.bOk)
+	{
+		ResponseObj->SetField(TEXT("result"), MakeShareable(new FJsonValueObject(MakeShareable(new FJsonObject()))));
+		ResponseObj->SetField(TEXT("error"), MakeShareable(new FJsonValueNull()));
+	}
+	else
+	{
+		ResponseObj->SetField(TEXT("result"), MakeShareable(new FJsonValueNull()));
+		TSharedPtr<FJsonObject> ErrorObj = MakeShareable(new FJsonObject());
+		ErrorObj->SetStringField(TEXT("code"), Response.ErrorCode);
+		ErrorObj->SetStringField(TEXT("message"), Response.ErrorMessage);
+		ResponseObj->SetField(TEXT("error"), MakeShareable(new FJsonValueObject(ErrorObj)));
+	}
+
+	FString ResponseStr;
+	TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Writer = TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&ResponseStr);
+	FJsonSerializer::Serialize(ResponseObj.ToSharedRef(), Writer);
+	ResponseStr += TEXT("\n");
+
+	FTCHARToUTF8 Converter(*ResponseStr);
+	int32 Sent = 0;
+	FScopeLock Lock(&ClientSocketCS);
+	return Client->Send(reinterpret_cast<const uint8*>(Converter.Get()), Converter.Length(), Sent);
+}

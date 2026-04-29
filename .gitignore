@@ -1,0 +1,40 @@
+# Unreal Engine generated
+**/Binaries/
+**/Intermediate/
+**/Saved/
+**/DerivedDataCache/
+
+# UE project files (regenerate via GenerateProjectFiles.bat)
+*.sln
+*.suo
+*.xcodeproj
+*.xcworkspace
+
+# IDE
+**/.vs/
+**/.vscode/
+**/.idea/
+*.iml
+
+# Kilo CLI
+.kilo/
+
+# Misc generated
+Backup/
+UpgradeLog.htm
+agent-manager.json
+.vsconfig
+
+# Python
+**/__pycache__/
+*.pyc
+*.egg-info/
+dist/
+.venv/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Old disabled plugin (replaced by UnrealEditorMCPBridge)
+UnrealEditorMCP/Plugins/UerealEditorMCP/
