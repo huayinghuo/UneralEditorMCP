@@ -167,6 +167,11 @@ Start-Sleep -Seconds 3
 $r = Send-Request "widget_set_root" @{ asset_path = "$bpPath.$bpName"; widget_class = "SizeBox" }
 Assert "7.2 replace root with SizeBox" $r.ok "error=$($r.error.code)"
 if ($r.ok) { $log += "   replaced=$($r.result.replaced)" }
+
+# Confirm destructive semantics: old widgets are no longer reachable
+Start-Sleep -Seconds 3
+$r = Send-Request "widget_find" @{ asset_path = "$bpPath.$bpName"; query = "RootVBox" }
+Assert "7.3 RootVBox gone after root replace" ($r.ok -and $r.result.count -eq 0) "count=$($r.result.count)"
 $log += ""
 
 # ===== Part 8: Final State =====

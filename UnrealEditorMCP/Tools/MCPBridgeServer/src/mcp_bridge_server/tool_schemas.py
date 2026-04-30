@@ -622,7 +622,7 @@ TOOL_SCHEMAS = {
     # ── Stage 16 Structure Editing ──
     "widget_set_root": {
         "name": "ue_widget_set_root",
-        "description": "Set or replace the root widget of a Widget Blueprint",
+        "description": "Set or replace the root widget of a Widget Blueprint. NOTE: replacing the root discards all existing children — rebuild the tree after calling this.",
         "inputSchema": {
             "type": "object",
             "properties": {
