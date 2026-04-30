@@ -131,41 +131,53 @@ Assert "5.2 duplicate TitleText" $r.ok "error=$($r.error.code)"
 Start-Sleep -Seconds 3
 $r = Send-Request "widget_reorder_child" @{ asset_path = "$bpPath.$bpName"; widget_name = "HeroImage"; index = 0 }
 Assert "5.3 reorder HeroImage to index 0" $r.ok "error=$($r.error.code)"
-
-Start-Sleep -Seconds 3
-$r = Send-Request "widget_set_root" @{ asset_path = "$bpPath.$bpName"; widget_class = "SizeBox" }
-Assert "5.4 replace root with SizeBox" $r.ok "error=$($r.error.code)"
-if ($r.ok) { $log += "   replaced=$($r.result.replaced)" }
 $log += ""
 
-# ===== Part 6: Wrap =====
-$log += "===== Part 6: Wrap ====="
-Start-Sleep -Seconds 3
-$r = Send-Request "widget_wrap_with_panel" @{ asset_path = "$bpPath.$bpName"; widget_name = "ConfirmButton"; panel_class = "Border"; wrapper_name = "ButtonBorder" }
-Assert "6.1 wrap ConfirmButton in Border" $r.ok "error=$($r.error.code)"
-$log += ""
-
-# ===== Part 7: Error paths =====
-$log += "===== Part 7: Error Paths ====="
+# ===== Part 6: Error paths (before root replace) =====
+$log += "===== Part 6: Error Paths ====="
 Start-Sleep -Seconds 3
 $r = Send-Request "widget_set_root" @{ asset_path = "$bpPath.$bpName"; widget_class = "NotAWidgetClass" }
-Assert "7.1 CLASS_NOT_FOUND for bad root" ((-not $r.ok) -and ($r.error.code -eq "CLASS_NOT_FOUND")) "code=$($r.error.code)"
+Assert "6.1 CLASS_NOT_FOUND for bad root" ((-not $r.ok) -and ($r.error.code -eq "CLASS_NOT_FOUND")) "code=$($r.error.code)"
 
 Start-Sleep -Seconds 3
 $r = Send-Request "widget_reparent" @{ asset_path = "$bpPath.$bpName"; widget_name = "RootVBox"; parent_widget = "ConfirmButton" }
-Assert "7.2 REPARENT_CYCLE" ((-not $r.ok) -and ($r.error.code -match "CYCLE|PANEL")) "code=$($r.error.code)"
+Assert "6.2 REPARENT_CYCLE" ((-not $r.ok) -and ($r.error.code -match "CYCLE|PANEL")) "code=$($r.error.code)"
 
 Start-Sleep -Seconds 3
 $r = Send-Request "widget_rename" @{ asset_path = "$bpPath.$bpName"; widget_name = "HeroImage"; new_name = "TitleText" }
-Assert "7.3 WIDGET_NAME_CONFLICT" ((-not $r.ok) -and ($r.error.code -eq "WIDGET_NAME_CONFLICT")) "code=$($r.error.code)"
+Assert "6.3 WIDGET_NAME_CONFLICT" ((-not $r.ok) -and ($r.error.code -eq "WIDGET_NAME_CONFLICT")) "code=$($r.error.code)"
 
 Start-Sleep -Seconds 3
 $r = Send-Request "widget_set_property" @{ asset_path = "$bpPath.$bpName"; widget_name = "TitleText"; property_name = "DoesNotExist"; value = "x" }
-Assert "7.4 PROPERTY_NOT_FOUND" ((-not $r.ok) -and ($r.error.code -eq "PROPERTY_NOT_FOUND")) "code=$($r.error.code)"
+Assert "6.4 PROPERTY_NOT_FOUND" ((-not $r.ok) -and ($r.error.code -eq "PROPERTY_NOT_FOUND")) "code=$($r.error.code)"
 
 Start-Sleep -Seconds 3
 $r = Send-Request "widget_set_slot_property" @{ asset_path = "$bpPath.$bpName"; widget_name = "TitleText"; property_name = "DoesNotExist"; value = "x" }
-Assert "7.5 SLOT_PROPERTY_NOT_SUPPORTED" ((-not $r.ok)) "code=$($r.error.code)"
+Assert "6.5 SLOT_PROPERTY_NOT_SUPPORTED" ((-not $r.ok)) "code=$($r.error.code)"
+$log += ""
+
+# ===== Part 7: Wrap + Root Replace =====
+$log += "===== Part 7: Wrap + Root Replace ====="
+Start-Sleep -Seconds 3
+$r = Send-Request "widget_wrap_with_panel" @{ asset_path = "$bpPath.$bpName"; widget_name = "ConfirmButton"; panel_class = "Border"; wrapper_name = "ButtonBorder" }
+Assert "7.1 wrap ConfirmButton in Border" $r.ok "error=$($r.error.code)"
+
+Start-Sleep -Seconds 3
+# Replace root: children are discarded (documented behavior)
+$r = Send-Request "widget_set_root" @{ asset_path = "$bpPath.$bpName"; widget_class = "SizeBox" }
+Assert "7.2 replace root with SizeBox" $r.ok "error=$($r.error.code)"
+if ($r.ok) { $log += "   replaced=$($r.result.replaced)" }
+$log += ""
+
+# ===== Part 8: Final State =====
+$log += "===== Part 8: Final State ====="
+Start-Sleep -Seconds 3
+$r = Send-Request "get_widget_info" @{ asset_path = "$bpPath.$bpName" }
+Assert "8.1 final get_widget_info" $r.ok "error=$($r.error.code)"
+
+Start-Sleep -Seconds 3
+$r = Send-Request "blueprint_compile_save" @{ asset_path = "$bpPath.$bpName"; save = $true }
+Assert "8.2 compile save" $r.ok "error=$($r.error.code)"
 $log += ""
 
 # ===== Part 8: Final state ====="

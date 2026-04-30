@@ -167,6 +167,21 @@ bool FMCPCreateWidgetBlueprintHandler::Execute(TSharedPtr<FJsonObject> Payload, 
 
 	FString PackageName = PackagePath / WidgetName;
 
+	// Pre-validate root_widget_class (before creating asset, to avoid partial-failure side effects)
+	UClass* RootClass = nullptr;
+	FString RootWidgetClass;
+	if (Payload.IsValid()) Payload->TryGetStringField(TEXT("root_widget_class"), RootWidgetClass);
+	if (!RootWidgetClass.IsEmpty())
+	{
+		RootClass = FindFirstObject<UClass>(*RootWidgetClass, EFindFirstObjectOptions::None, ELogVerbosity::NoLogging);
+		if (!RootClass) RootClass = FindFirstObject<UClass>(*(FString(TEXT("U") + RootWidgetClass)), EFindFirstObjectOptions::None, ELogVerbosity::NoLogging);
+		if (!RootClass || !RootClass->IsChildOf(UWidget::StaticClass()))
+		{
+			MCPBridgeHelpers::BuildErrorResponse(TEXT("CLASS_NOT_FOUND"), FString::Printf(TEXT("Root widget class '%s' not found or not a widget"), *RootWidgetClass), OutErrorCode, OutErrorMessage);
+			return false;
+		}
+	}
+
 	// 冲突检测：通过 AssetRegistry
 	{
 		FString ObjectPath = PackageName + TEXT(".") + WidgetName;
@@ -210,18 +225,9 @@ bool FMCPCreateWidgetBlueprintHandler::Execute(TSharedPtr<FJsonObject> Payload, 
 	OutResult->SetBoolField(TEXT("created"), true);
 	OutResult->SetBoolField(TEXT("saved"), bSaved);
 
-	// 可选 root widget 设定
-	FString RootWidgetClass;
-	if (Payload->TryGetStringField(TEXT("root_widget_class"), RootWidgetClass) && !RootWidgetClass.IsEmpty())
+	// 可选 root widget 设定（class 已在 BP 创建前通过预校验）
+	if (RootClass)
 	{
-		UClass* RootClass = FindFirstObject<UClass>(*RootWidgetClass, EFindFirstObjectOptions::None, ELogVerbosity::NoLogging);
-		if (!RootClass) RootClass = FindFirstObject<UClass>(*(FString(TEXT("U") + RootWidgetClass)), EFindFirstObjectOptions::None, ELogVerbosity::NoLogging);
-		if (!RootClass || !RootClass->IsChildOf(UWidget::StaticClass()))
-		{
-			MCPBridgeHelpers::BuildErrorResponse(TEXT("CLASS_NOT_FOUND"), FString::Printf(TEXT("Root widget class '%s' not found or not a widget"), *RootWidgetClass), OutErrorCode, OutErrorMessage);
-			return false;
-		}
-
 		WidgetBP->Modify();
 		WidgetBP->WidgetTree->RootWidget = WidgetBP->WidgetTree->ConstructWidget<UWidget>(RootClass, FName(*RootWidgetClass));
 		FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WidgetBP);
@@ -544,26 +550,8 @@ bool FMCPWidgetSetRootHandler::Execute(TSharedPtr<FJsonObject> Payload, TSharedP
 
 	if (WidgetBP->WidgetTree->RootWidget)
 	{
-		// Replace: migrate existing root's children to new root, then replace
-		UWidget* OldRoot = WidgetBP->WidgetTree->RootWidget;
-		UWidget* NewRoot = WidgetBP->WidgetTree->ConstructWidget<UWidget>(WClass, FName(*WidgetClass));
-		if (!NewRoot)
-		{ MCPBridgeHelpers::BuildErrorResponse(TEXT("CREATE_FAILED"), TEXT("Failed to construct new root widget"), OutErrorCode, OutErrorMessage); return false; }
-
-		// If old root is a panel, move its children to new root
-		if (UPanelWidget* OldPanel = Cast<UPanelWidget>(OldRoot))
-		{
-			TArray<UWidget*> ChildrenCopy;
-			for (int32 i = 0; i < OldPanel->GetChildrenCount(); ++i)
-				ChildrenCopy.Add(OldPanel->GetChildAt(i));
-
-			for (UWidget* Child : ChildrenCopy)
-			{
-				if (UPanelWidget* NewPanel = Cast<UPanelWidget>(NewRoot))
-					NewPanel->AddChild(Child);
-			}
-		}
-		WidgetBP->WidgetTree->RootWidget = NewRoot;
+		// Replace: set new root directly (children of old root are discarded)
+		WidgetBP->WidgetTree->RootWidget = WidgetBP->WidgetTree->ConstructWidget<UWidget>(WClass, FName(*WidgetClass));
 		bReplaced = true;
 	}
 	else

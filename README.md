@@ -85,7 +85,7 @@ Unreal Engine 5.3 Editor
 | `ue_blueprint_apply_spec` | 从声明式 spec JSON 创建 BP 图 |
 | `ue_blueprint_export_spec` | 导出已有 BP 的 EventGraph 为 spec |
 
-### Widget 深化编辑（9）
+### Widget 深化编辑（10）
 | 工具 | 说明 |
 |------|------|
 | `ue_widget_get_property_schema` | 查询控件可编辑属性清单（name/type/editable） |
