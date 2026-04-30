@@ -1,8 +1,8 @@
 # Last Operation
 
 Session: 2026-04-30 15:14
-Phase: 阶段 16 — Widget 能力完整深化 + 阶段 15A 并发串行化
-Status: ✅ 58 Handler，26/26 验收通过
+Phase: 阶段 16 — Widget 能力完整深化
+Status: ✅ 58 Handler，28/28 验收通过
 
 ## 阶段 15A — BridgeClient 并发串行化
 
@@ -23,8 +23,9 @@ Status: ✅ 58 Handler，26/26 验收通过
 - `widget_reorder_child`：调整 sibling 顺序
 - `widget_rename`：重命名 + 冲突检测
 
-### Slice 3 — Slot 编辑 (+1 Handler，57→58)
+### Slice 3 — Slot 编辑 + 属性类型增强 (+1 Handler，57→58)
 - `widget_set_slot_property`：设置 slot 布局属性
+- 增强 `widget_set_property`：支持 string / number / boolean typed value
 
 ### Slice 5 — 高阶树操作
 - `widget_duplicate`：复制节点/子树 (DuplicateObject)
@@ -38,10 +39,10 @@ WIDGET_NAME_CONFLICT, WIDGET_DUPLICATE_FAILED, WIDGET_WRAP_FAILED,
 SLOT_NOT_FOUND, SLOT_PROPERTY_NOT_SUPPORTED
 
 ### 验收
-- `test_stage16_widget_deep.ps1`：8 Parts，26 assertions
-- 正向：创建含root + 5节点树 + 查询 + 属性/slot编辑 + reparent/rename/duplicate/wrap + 编译保存
-- 错误：ROOT_ALREADY_EXISTS, REPARENT_CYCLE, NAME_CONFLICT, PROPERTY_NOT_FOUND, SLOT_NOT_SUPPORTED
-- 结果：26/26 PASS, 0 FAIL
+- `test_stage16_widget_deep.ps1`：8 Parts，28 assertions
+- 正向：创建含root + 5节点树 + 查询 + 属性/slot编辑 + reparent/rename/duplicate/wrap + root replace + 旧子树消失断言 + 编译保存
+- 错误：CLASS_NOT_FOUND, REPARENT_CYCLE, NAME_CONFLICT, PROPERTY_NOT_FOUND, SLOT_NOT_SUPPORTED
+- 结果：28/28 PASS, 0 FAIL
 
 ## 项目当前状态
 Handler: 58 (Read 26 / Write 31 / Dangerous 1)

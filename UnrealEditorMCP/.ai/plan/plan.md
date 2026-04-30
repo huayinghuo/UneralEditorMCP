@@ -26,7 +26,7 @@
 | **14** | **MCP Resources 知识层**（4 static + 2 live resources） | ✅ |
 | **14A** | **Resources 契约统一 + 测试分层** | ✅ |
 | **15A** | **BridgeClient 并发串行化** | ✅ |
-| **16** | **Widget 能力完整深化**（50→58 Handler，11 新增 + 2 增强，26/26 验收通过） | ✅ |
+| **16** | **Widget 能力完整深化**（50→58 Handler，11 新增 + 2 增强，28/28 验收通过） | ✅ |
 
 ## Handler 清单（58 个）
 
@@ -64,9 +64,10 @@ Dangerous (1): execute_python_snippet
 | Part 4 | 属性编辑（Text）+ Slot 编辑（Padding/HAlign） | ✅ |
 | Part 5 | Reparent, Rename, Duplicate | ✅ |
 | Part 6 | Wrap（Border 包裹 Button） | ✅ |
-| Part 7 | 错误路径（ROOT_ALREADY_EXISTS/CYCLE/CONFLICT/NOT_FOUND/SLOT） | ✅ |
+| Part 6 | 错误路径（CLASS_NOT_FOUND/CYCLE/CONFLICT/NOT_FOUND/SLOT） | ✅ |
+| Part 7 | Wrap + Root Replace + 旧子树消失断言 | ✅ |
 | Part 8 | 编译保存 + 终态验证 | ✅ |
-| **总计** | **26/26 PASS, 0 FAIL** | ✅ |
+| **总计** | **28/28 PASS, 0 FAIL** | ✅ |
 
 ## 11A 验收测试（2026-04-30）
 
@@ -141,6 +142,14 @@ Dangerous (1): execute_python_snippet
 | READ_TIMEOUT | Python 客户端读取超时 | bridge_client.py |
 | PEER_CLOSED | UE 侧关闭连接 | bridge_client.py |
 | RESPONSE_MISMATCH | 响应 ID 不匹配（协议串包） | bridge_client.py |
+| ROOT_ALREADY_EXISTS | root widget 已存在 | widget_set_root |
+| PARENT_NOT_PANEL | 目标父节点不是 Panel | widget_reparent |
+| WIDGET_NAME_CONFLICT | Widget 名称冲突 | widget_rename / widget_duplicate |
+| REPARENT_CYCLE_FORBIDDEN | reparent 会形成循环引用 | widget_reparent |
+| SLOT_NOT_FOUND | Widget 无 slot | widget_set_slot_property |
+| SLOT_PROPERTY_NOT_SUPPORTED | slot 属性不存在 | widget_set_slot_property |
+| WIDGET_DUPLICATE_FAILED | 复制 Widget 失败 | widget_duplicate |
+| WIDGET_WRAP_FAILED | 包裹 Widget 失败 | widget_wrap_with_panel |
 
 ---
 

@@ -8,7 +8,7 @@
 
 ## 当前阶段（2026-04-30）
 
-**当前主线：阶段 16 已完成** — Widget 完整深化（58 Handler，26/26 通过）
+**当前主线：阶段 16 已完成** — Widget 完整深化（58 Handler，28/28 通过）
 
 ### 已完成里程碑
 
@@ -36,20 +36,26 @@
 
 ### 当前不在做的
 
-- 不新增大批业务 Handler（已从 48 → 49，仅新增 1 个诊断查询）
 - 不切换 HTTP/SSE/WebSocket 传输协议
 - 不实现 UE 侧真正多客户端并发会话池（已固定为单客户端独占模型）
 - 不做远程部署、TLS、LAN 暴露
-- 多 Graph 类型 / 更新既有 Blueprint / 更多节点白名单（暂不扩展）
-- 为所有 AI 客户端各写一套 skill（已拒绝，改为 P2 Resources 方案）
-- 仓库内完整计划与外部主计划双向维护（单向同步，外部为主）
+- 不做 Widget Animation 时间轴/关键帧编辑
+- 不为所有 AI 客户端各写一套 skill（已拒绝，改为 P2 Resources 方案）
 
 ### 12A 关键变更
 
 - **单客户端模型**：已文档化，第二连接被显式拒绝（`CLIENT_ALREADY_CONNECTED`），不再依赖隐式 accept 时机
-- **运行时诊断**：新增 `get_bridge_runtime_status`（49th Handler），暴露 server_status / last_error / client_connected / transport_mode 等字段
+- **运行时诊断**：新增 `get_bridge_runtime_status`，暴露 server_status / last_error / client_connected / transport_mode 等字段
 - **Python 错误分类**：`UEBridgeError` 携带分类码（CONNECT_TIMEOUT / READ_TIMEOUT / PEER_CLOSED / CLIENT_ALREADY_CONNECTED / RESPONSE_MISMATCH）
 - **启动失败可见**：`SetLastError()` 记录 Bind/Listen 错误，模块 startup warning 结构化输出
+
+### 16 关键变更（Widget 完整深化）
+
+- **9 个新增 Widget handler**：property_schema / slot_schema / find / set_root / reparent / reorder_child / rename / set_slot_property / duplicate / wrap_with_panel
+- **2 个增强**：create_widget_blueprint 支持 root_widget_class + 预校验，widget_add_child 支持 index 插入
+- **widget_set_root 支持替换**（替换时丢弃已有子树，文档已同步破坏性语义）
+- **8 个新错误码**：ROOT_ALREADY_EXISTS, PARENT_NOT_PANEL, WIDGET_NAME_CONFLICT, REPARENT_CYCLE_FORBIDDEN, SLOT_NOT_FOUND, SLOT_PROPERTY_NOT_SUPPORTED, WIDGET_DUPLICATE_FAILED, WIDGET_WRAP_FAILED
+- **验收**：test_stage16_widget_deep.ps1，8 Parts，28 assertions
 
 ---
 
@@ -71,7 +77,7 @@ Unreal Engine 5.3 Editor
 
 ---
 
-## 能力清单（49 Handler）
+## 能力清单（58 Handler）
 
 | 类别 | 数量 | 工具 |
 |------|------|------|
@@ -79,12 +85,13 @@ Unreal Engine 5.3 Editor
 | 资产浏览 | 6 | list_assets, asset_info, list_blueprints, list_materials, list_widgets, widget_info |
 | Actor 操作 | 6 | selected_actors, level_actors, get_actor_property, get_component_property, spawn, delete |
 | 编辑操作 | 5 | set_transform, set_actor_property, set_component_property, save_level, viewport_screenshot |
-| 资产编辑 | 10 | create_blueprint, add_variable, add_function, create_widget_bp, widget_add/remove/set, material_set_scalar/vector/texture |
+| 资产编辑 | 10 | create_blueprint, add_variable, add_function, add_component, create_widget_bp, widget_add/remove/set_property, material_set_scalar/vector/texture |
+| Widget 深化 | 10 | widget_get_property_schema, widget_get_slot_schema, widget_find, widget_set_root, widget_reparent, widget_reorder_child, widget_rename, widget_set_slot_property, widget_duplicate, widget_wrap_with_panel |
 | Blueprint 图编辑 | 8 | create_actor_class, event_graph_info, add_event_node, add_call_function_node, connect_pins, compile_save, apply_spec, export_spec |
 | 事务控制 | 4 | begin/end/undo/redo |
-| 10C 自举 | - | bootstrap config + offline degradation |
+| Blueprint 信息 | 1 | get_blueprint_info |
+| Material 信息 | 1 | get_material_info |
 | Python | 1 | execute_python_snippet (Dangerous) |
-| 蓝图/材质信息 | 2 | get_blueprint_info, get_material_info |
 
 ---
 
@@ -126,7 +133,7 @@ UnrealEditorMCP/                          ← Git 仓库根
 │       └── src/mcp_bridge_server/
 │           ├── server.py                 # MCP 入口 + bootstrap fallback
 │           ├── bridge_client.py          # TCP 客户端
-│           └── tool_schemas.py           # 48 tool schema 注册表
+│           └── tool_schemas.py           # 58 tool schema 注册表
 ```
 
 ---
