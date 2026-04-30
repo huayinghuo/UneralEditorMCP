@@ -115,12 +115,30 @@ Write-Host "ping ok=$($r.ok)"
 
 ### 2.4 测试脚本位置
 
-| 文件 | 用途 |
-|------|------|
-| `UnrealEditorMCP\Tools\MCPBridgeServer\tests\test_bridge.py` | 基础联通测试（Python, 需可用） |
-| `UnrealEditorMCP\Tools\MCPBridgeServer\tests\test_bp_ops.py` | Blueprint 变量/函数测试 |
-| `UnrealEditorMCP\Tools\MCPBridgeServer\tests\test_stage11a.py` | 阶段 11A 验收测试（Python, 需可用） |
-| `UnrealEditorMCP\Tools\MCPBridgeServer\tests\test_stage11a.ps1` | 阶段 11A 验收测试（PowerShell, 推荐） |
+| 文件 | 用途 | Python 依赖 |
+|------|------|------------|
+| `UnrealEditorMCP\Tools\MCPBridgeServer\tests\test_bridge.py` | 基础联通测试（Python, 需可用） | 需要 |
+| `UnrealEditorMCP\Tools\MCPBridgeServer\tests\test_bp_ops.py` | Blueprint 变量/函数测试 | 需要 |
+| `UnrealEditorMCP\Tools\MCPBridgeServer\tests\test_stage11a.py` | 阶段 11A 验收测试（Python, 需可用） | 需要 |
+| `UnrealEditorMCP\Tools\MCPBridgeServer\tests\test_stage11a.ps1` | 阶段 11A 验收测试（PowerShell, 推荐） | 不需要 |
+| `UnrealEditorMCP\Tools\MCPBridgeServer\tests\test_stage14_resources.ps1` | 阶段 14 资源层验收（双模：有 Python 走协议链路 / 无 Python 退化为 TCP 回归） | 可选 |
+| `UnrealEditorMCP\Tools\MCPBridgeServer\tests\test_resources_mcp.py` | 阶段 14 MCP 协议层精确测试（需要 Python 3.10+ + mcp SDK） | 需要 |
+
+### 2.4b 阶段 14 资源层测试模型
+
+阶段 14 验收采用双层架构：
+
+- **Layer 1 (TCP 回归)**: PowerShell 直连 TCP，校验 `get_mcp_config` / `get_bridge_runtime_status`。始终可执行。
+- **Layer 2 (MCP 协议)**: Python 子进程拉起 MCP Server，通过 JSON-RPC stdio 校验 `resources/list` / `resources/read`。需要 Python + mcp SDK。
+
+`test_stage14_resources.ps1` 会先探测 Python 可用性：
+- Python 可用 → 执行完整 Layer 1 + Layer 2
+- Python 不可用 → 跳过 Layer 2，输出 `SKIPPED`，仍执行 Layer 1 TCP 回归
+
+安装 Python 依赖（需要时）：
+```powershell
+pip install mcp>=1.0.0
+```
 
 ### 2.5 验收测试检查清单
 

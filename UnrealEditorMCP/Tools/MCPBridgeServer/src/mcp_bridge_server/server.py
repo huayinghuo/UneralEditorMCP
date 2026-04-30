@@ -243,7 +243,9 @@ class UEMCPServer:
         return ReadResourceContents(
             content=json.dumps({
                 "server_status": "Unavailable",
-                "connected": False,
+                "client_connected": False,
+                "last_error_code": "",
+                "last_error_message": "",
                 "resource_source": "python-offline",
                 "note": "UE Editor is not running or bridge is not reachable",
             }, indent=2, ensure_ascii=False),
