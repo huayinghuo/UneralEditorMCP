@@ -16,12 +16,13 @@ Unreal Engine 5.3 Editor
 
 **传输层可替换**，当前使用本地 TCP + 外部 Python Server，后续可评估 HTTP/SSE。
 
-## 能力清单（48 Handler）
+## 能力清单（58 Handler）
 
-### 编辑器状态（6）
+### 编辑器状态（7）
 | 工具 | 说明 |
 |------|------|
 | `ue_ping` | 连通性测试 |
+| `ue_get_bridge_runtime_status` | 传输层运行时状态（server_status / client_connected / last_error） |
 | `ue_get_editor_info` | 引擎版本、编辑器标识 |
 | `ue_get_project_info` | 项目名称、磁盘路径 |
 | `ue_get_world_state` | 世界名、Actor 数、World Partition 状态 |
@@ -36,7 +37,7 @@ Unreal Engine 5.3 Editor
 | `ue_list_blueprints` | 列出 Blueprint 资产 |
 | `ue_list_materials` | 列出 Material/MaterialInstance |
 | `ue_list_widgets` | 列出 Widget Blueprint |
-| `ue_get_widget_info` | Widget 树结构 |
+| `ue_get_widget_info` | Widget 树结构（root / parent / slot_class / is_variable） |
 
 ### Actor 操作（6）
 | 工具 | 说明 |
@@ -57,16 +58,17 @@ Unreal Engine 5.3 Editor
 | `ue_save_current_level` | 保存关卡 |
 | `ue_viewport_screenshot` | 视口截图→PNG |
 
-### 资产编辑（7）
+### 资产编辑（11）
 | 工具 | 说明 |
 |------|------|
 | `ue_create_blueprint` | 创建 Blueprint（指定父类/路径，含冲突检测） |
 | `ue_blueprint_add_variable` | 添加变量（bool/int/float/string/Vector/Rotator/Color） |
 | `ue_blueprint_add_function` | 添加函数图（含重名检测） |
-| `ue_create_widget_blueprint` | 创建 Widget Blueprint |
-| `ue_widget_add_child` | 向 Widget 树添加控件（TextBlock/Button/Image等） |
+| `ue_blueprint_add_component` | 向 BP 的 SCS 添加组件（任意 UActorComponent 子类） |
+| `ue_create_widget_blueprint` | 创建 Widget Blueprint（可选 root_widget_class） |
+| `ue_widget_add_child` | 向 Widget 树添加控件（可选 index 插入位置） |
 | `ue_widget_remove_child` | 从 Widget 树移除控件 |
-| `ue_widget_set_property` | 设置 Widget Blueprint 中控件的属性 |
+| `ue_widget_set_property` | 设置 Widget 属性 + read-back |
 | `ue_material_set_scalar_param` | 设置 MaterialInstance 标量参数 |
 | `ue_material_set_vector_param` | 设置 MaterialInstance 向量/颜色参数 |
 | `ue_material_set_texture_param` | 设置 MaterialInstance 纹理参数 |
@@ -80,11 +82,22 @@ Unreal Engine 5.3 Editor
 | `ue_blueprint_add_call_function_node` | 添加 CallFunction 节点 |
 | `ue_blueprint_connect_pins` | 连接引脚 |
 | `ue_blueprint_compile_save` | 编译 Blueprint（可选保存） |
-| `ue_blueprint_apply_spec` | 从声明式 spec JSON 创建 BP 图（事件+函数+连线），**不自动编译**，需后续调用 `compile_save` 验证 |
+| `ue_blueprint_apply_spec` | 从声明式 spec JSON 创建 BP 图 |
 | `ue_blueprint_export_spec` | 导出已有 BP 的 EventGraph 为 spec |
 
-### 10C：离断链自举
-Python MCP Server 在 UE 未连接时返回 `BOOTSTRAP_MCP_CONFIG`（`source=python-bootstrap`），UE 在线后自动切换为 live config（`source=ue-live`），断连后退化回 bootstrap。`list_tools` 与 `ue_get_mcp_config` 离线结果共用同一配置源。
+### Widget 深化编辑（9）
+| 工具 | 说明 |
+|------|------|
+| `ue_widget_get_property_schema` | 查询控件可编辑属性清单（name/type/editable） |
+| `ue_widget_get_slot_schema` | 查询控件 slot 类及可编辑属性 |
+| `ue_widget_find` | 按 name/class 搜索 Widget 树节点 |
+| `ue_widget_set_root` | 设定/替换 root widget |
+| `ue_widget_reparent` | 移动节点到新 parent（含循环检测） |
+| `ue_widget_reorder_child` | 调整 sibling 顺序 |
+| `ue_widget_rename` | 重命名节点（含冲突检测） |
+| `ue_widget_set_slot_property` | 设置 slot 布局属性（padding/alignment/anchors） |
+| `ue_widget_duplicate` | 复制节点/子树 |
+| `ue_widget_wrap_with_panel` | 用容器面板包裹现有控件 |
 
 ### 事务控制（4）
 | 工具 | 说明 |
@@ -94,12 +107,22 @@ Python MCP Server 在 UE 未连接时返回 `BOOTSTRAP_MCP_CONFIG`（`source=pyt
 | `ue_undo` | 撤销（自动结束活跃事务） |
 | `ue_redo` | 重做（自动结束活跃事务） |
 
-### Python（1，Dangerous）
+### Python / 信息（3）
 | 工具 | 说明 |
 |------|------|
-| `ue_execute_python_snippet` | 执行 UE Python 代码 |
+| `ue_execute_python_snippet` | 执行 UE Python 代码（Dangerous） |
 | `ue_get_blueprint_info` | BP 详情：父类/变量/函数/接口 |
 | `ue_get_material_info` | 材质详情：blend_mode/参数列表 |
+
+### MCP Resources（6）
+| Resource URI | 类型 | 说明 |
+|------|------|------|
+| `ue://resources/overview` | Static | 项目架构、Handler 分类、单客户端模型 |
+| `ue://resources/error-model` | Static | UEBridgeError 分类、所有错误码、客户端指导 |
+| `ue://resources/workflows` | Static | 常用调用链（BP 创建/编辑/Spec/Widget/事务/材质） |
+| `ue://resources/blueprint-spec` | Static | 11A/11B spec 格式、边界、round-trip、常见问题 |
+| `ue://runtime/config` | Live | 当前 action registry / mode / token_enabled |
+| `ue://runtime/status` | Live | 当前 server_status / client_connected / last_error |
 
 ## 目录
 
@@ -116,7 +139,7 @@ UnrealEditorMCP/                    ← Git 仓库根目录
 │   │   ├── Config/                      # ini 配置（Token/Port）
 │   │   ├── Source/UnrealEditorMCPBridge/
 │   │   │   ├── Public/                  # Handler 接口、调度器、Helpers
-│   │   │   │   └── Handlers/            # 11 个领域文件（50 Handler：49 + 1 blueprint_add_component）
+│   │   │   │   └── Handlers/            # 11 个领域文件（58 Handler）
 │   │   │   └── Private/                 # 实现
 │   │   └── Resources/
 │   ├── Tools/MCPBridgeServer/           # Python MCP Server
@@ -124,8 +147,12 @@ UnrealEditorMCP/                    ← Git 仓库根目录
 │   │   │   ├── server.py                # MCP 入口
 │   │   │   ├── bridge_client.py         # TCP 客户端
 │   │   │   ├── resources.py             # MCP Resources 知识层（4 static + 2 live）
-│   │   │   └── tool_schemas.py          # 49 tool schema 注册表
+│   │   │   └── tool_schemas.py          # 58 tool schema 注册表
 │   │   └── tests/
+│   │       ├── test_stage12a.ps1          # 传输层稳态化验收
+│   │       ├── test_stage14_resources.ps1 # 资源层验收（双模）
+│   │       ├── test_resources_mcp.py      # MCP 协议层精确测试
+│   │       └── test_stage16_widget_deep.ps1 # Widget 深化验收
 │   └── .ai/                             # 项目治理（plan / log / dev）
 └── Config/                              # 项目工程配置
 ```
@@ -195,8 +222,8 @@ Port=9876
 ## 权限模型
 
 ```
-Read (20)：ping / *_info / list_* / get_* / viewport_screenshot / get_dirty_packages
-Write (25)：spawn / set_* / delete / save / create_* / transaction / material_set_* / blueprint_add_* / widget_*
+Read (26)：ping / status / *_info / list_* / get_* / viewport_screenshot / dirty_packages / widget_*_schema / widget_find
+Write (31)：spawn / set_* / delete / save / create_* / transaction / material_set_* / blueprint_add_* / widget_*
 Dangerous (1)：execute_python_snippet
 ```
 
@@ -206,9 +233,10 @@ Dangerous (1)：execute_python_snippet
 
 - 仅本地回环（127.0.0.1），不支持远程访问
 - 单客户端独占 TCP 连接模式（第二连接被拒绝并返回 CLIENT_ALREADY_CONNECTED 错误）
-- 运行时诊断：支持 `get_bridge_runtime_status` 查询服务状态（server_status / client_connected / last_error 等）
-- Blueprint 支持变量/函数添加 + 节点级图编辑（Event/CallFunction/ConnectPins/CompileSave）+ 声明式 spec 重建（apply/export）
-- Widget 支持创建、查询 + 树编辑（add_child / remove_child / set_property）
+- 运行时诊断：支持 `ue_get_bridge_runtime_status` + `ue_get_mcp_config` + `ue://runtime/*` Resources
+- Blueprint：支持变量/函数添加 + 组件添加 + 节点级图编辑 + 声明式 spec 重建
+- Widget：完整 UMG Designer 闭环（创建/查询/schema/树编辑/slot/属性/wrap/duplicate）
+- Python 协议桥：线程安全（UEBridgeClient.send 实例级 Lock 串行化）
 - 不包含 Sequencer / Niagara / Animation 操作
 
 ## License
