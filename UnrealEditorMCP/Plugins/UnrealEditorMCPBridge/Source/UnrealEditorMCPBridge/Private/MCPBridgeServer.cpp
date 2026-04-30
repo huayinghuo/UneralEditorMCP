@@ -92,13 +92,23 @@ void FMCPBridgeServer::RegisterHandlers()
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPSetMaterialScalarParamHandler()));
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPSetMaterialVectorParamHandler()));
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPSetMaterialTextureParamHandler()));
-	// Widget（6 个）
+	// Widget（17 个 — 含 Stage 16 完整深化）
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPListWidgetsHandler()));
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPGetWidgetInfoHandler()));
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPCreateWidgetBlueprintHandler()));
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPWidgetAddChildHandler()));
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPWidgetRemoveChildHandler()));
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPWidgetSetPropertyHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPWidgetGetPropertySchemaHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPWidgetGetSlotSchemaHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPWidgetFindHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPWidgetSetRootHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPWidgetReparentHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPWidgetReorderChildHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPWidgetRenameHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPWidgetSetSlotPropertyHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPWidgetDuplicateHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPWidgetWrapWithPanelHandler()));
 	// Dirty（1 个）
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPGetDirtyPackagesHandler()));
 }

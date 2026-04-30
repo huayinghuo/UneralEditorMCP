@@ -580,4 +580,136 @@ TOOL_SCHEMAS = {
             "required": ["asset_path", "widget_name", "property_name", "value"],
         },
     },
+    # ── Stage 16 Widget Deepening ──
+    "widget_get_property_schema": {
+        "name": "ue_widget_get_property_schema",
+        "description": "Get editable property schema for a widget (name, type, editable, read_only per property)",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "asset_path": {"type": "string"},
+                "widget_name": {"type": "string"},
+            },
+            "required": ["asset_path", "widget_name"],
+        },
+    },
+    "widget_get_slot_schema": {
+        "name": "ue_widget_get_slot_schema",
+        "description": "Get slot property schema for a widget's current slot (slot_class, editable properties)",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "asset_path": {"type": "string"},
+                "widget_name": {"type": "string"},
+            },
+            "required": ["asset_path", "widget_name"],
+        },
+    },
+    "widget_find": {
+        "name": "ue_widget_find",
+        "description": "Find widgets in a Widget Blueprint by name/class substring query",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "asset_path": {"type": "string"},
+                "query": {"type": "string", "description": "Substring to match against widget name or class (empty = all)"},
+            },
+            "required": ["asset_path"],
+        },
+    },
+    # ── Stage 16 Structure Editing ──
+    "widget_set_root": {
+        "name": "ue_widget_set_root",
+        "description": "Set or replace the root widget of a Widget Blueprint",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "asset_path": {"type": "string"},
+                "widget_class": {"type": "string", "description": "Widget class name, e.g. CanvasPanel, SizeBox"},
+            },
+            "required": ["asset_path", "widget_class"],
+        },
+    },
+    "widget_reparent": {
+        "name": "ue_widget_reparent",
+        "description": "Move a widget to a new parent panel (with circular reference detection)",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "asset_path": {"type": "string"},
+                "widget_name": {"type": "string"},
+                "parent_widget": {"type": "string", "description": "Target panel widget name"},
+            },
+            "required": ["asset_path", "widget_name", "parent_widget"],
+        },
+    },
+    "widget_reorder_child": {
+        "name": "ue_widget_reorder_child",
+        "description": "Change a widget's index within its parent panel",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "asset_path": {"type": "string"},
+                "widget_name": {"type": "string"},
+                "index": {"type": "integer", "description": "New zero-based index (default 0)"},
+            },
+            "required": ["asset_path", "widget_name"],
+        },
+    },
+    "widget_rename": {
+        "name": "ue_widget_rename",
+        "description": "Rename a widget in the Widget Blueprint tree",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "asset_path": {"type": "string"},
+                "widget_name": {"type": "string"},
+                "new_name": {"type": "string"},
+            },
+            "required": ["asset_path", "widget_name", "new_name"],
+        },
+    },
+    # ── Stage 16 Slot Editing ──
+    "widget_set_slot_property": {
+        "name": "ue_widget_set_slot_property",
+        "description": "Set a slot layout property on a widget (e.g. padding, alignment, anchors)",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "asset_path": {"type": "string"},
+                "widget_name": {"type": "string"},
+                "property_name": {"type": "string"},
+                "value": {"type": "string"},
+            },
+            "required": ["asset_path", "widget_name", "property_name", "value"],
+        },
+    },
+    # ── Stage 16 Advanced Tree Operations ──
+    "widget_duplicate": {
+        "name": "ue_widget_duplicate",
+        "description": "Duplicate a widget (or subtree) within the same parent",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "asset_path": {"type": "string"},
+                "widget_name": {"type": "string"},
+                "new_name": {"type": "string", "description": "Optional new name (default: original_Copy)"},
+            },
+            "required": ["asset_path", "widget_name"],
+        },
+    },
+    "widget_wrap_with_panel": {
+        "name": "ue_widget_wrap_with_panel",
+        "description": "Wrap an existing widget inside a new container panel (Border, SizeBox, etc.)",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "asset_path": {"type": "string"},
+                "widget_name": {"type": "string"},
+                "panel_class": {"type": "string", "description": "Panel class name, e.g. Border, SizeBox, Overlay"},
+                "wrapper_name": {"type": "string", "description": "Optional wrapper name"},
+            },
+            "required": ["asset_path", "widget_name", "panel_class"],
+        },
+    },
 }
