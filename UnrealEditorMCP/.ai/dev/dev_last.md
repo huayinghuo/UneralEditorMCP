@@ -1,33 +1,49 @@
 # Last Operation
 
-Session: 2026-04-30 13:34
-Phase: 阶段 15A — BridgeClient 并发串行化 + 项目镜像收口
-Status: ✅ 完成，49 Handler + 6 Resources，稳定性基线建立
+Session: 2026-04-30 15:14
+Phase: 阶段 16 — Widget 能力完整深化 + 阶段 15A 并发串行化
+Status: ✅ 58 Handler，26/26 验收通过
 
-## 阶段 15A-A — Python 桥接串行化
+## 阶段 15A — BridgeClient 并发串行化
 
-- `bridge_client.py`：`UEBridgeClient.__init__` 新增 `self._lock = threading.Lock()`
-- `send()` 全流程（ensure_connected / sendall / _read_response / disconnect）置于 `with self._lock:` 内部
-- 消除 `list_tools` / `call_tool` / `read_resource` 并发调用时的共享 socket/buffer 竞争风险
-- 不改对外 API，不改错误码，最小改动
+- `bridge_client.py`：新增 `threading.Lock`，`send()` 全流程在锁内
+- 消除 `list_tools` / `call_tool` / `read_resource` 并发共享 socket 竞争
 
-## 阶段 15A-B — 文档与镜像收口
+## 阶段 16 — Widget 能力完整深化
 
-- `README.md`：48→49 Handler，目录新增 `resources.py`
-- `plan_sync.md`：当前主线更新为 14/14A 已完成
-- `plan_index.md`：当前阶段 14A 完成
-- `dev_last.md`：本文件覆盖
-- `plan_log.md` / `log.md`：追加 15A 变更记录
+### Slice 1 — 查询与自描述 (+3 Handler，50→53)
+- 增强 `get_widget_info`：root_widget, parent, slot_class, is_variable
+- `widget_get_property_schema`：可编辑属性列表 (name/type/editable/read_only)
+- `widget_get_slot_schema`：slot class + 可编辑属性
+- `widget_find`：按 name/class 搜索树节点
 
-## 项目当前基线
+### Slice 2 — 结构编辑 (+4 Handler，53→57)
+- `widget_set_root`：设定/替换 root widget
+- `widget_reparent`：移动节点 + 循环引用检测
+- `widget_reorder_child`：调整 sibling 顺序
+- `widget_rename`：重命名 + 冲突检测
 
-```
-pouncing-spell 提交历史：
-c3e1569  Stage 14A: resources contract stabilization and test portability
-4213b7b  Stage 14 v2: fix MCP resources protocol chain with real stdio test
-22fc0cd  Stage 14: MCP Resources knowledge layer (Static + Live)
-d453b3d  Stage 12A: transport layer stabilization and observability closure
+### Slice 3 — Slot 编辑 (+1 Handler，57→58)
+- `widget_set_slot_property`：设置 slot 布局属性
 
-能力面：49 Handler + 6 Resources（4 static + 2 live）+ 双层测试模型（Layer 1 TCP / Layer 2 MCP）
-稳定性：单客户端独占 + CLIENT_ALREADY_CONNECTED + last error 追踪 + BridgeClient 并发串行化
-```
+### Slice 5 — 高阶树操作
+- `widget_duplicate`：复制节点/子树 (DuplicateObject)
+- `widget_wrap_with_panel`：用 Border/SizeBox 等包裹节点
+- 增强 `create_widget_blueprint`：可选 root_widget_class
+- 增强 `widget_add_child`：可选 index 位置
+
+### 新增错误码
+ROOT_ALREADY_EXISTS, PARENT_NOT_PANEL, REPARENT_CYCLE_FORBIDDEN,
+WIDGET_NAME_CONFLICT, WIDGET_DUPLICATE_FAILED, WIDGET_WRAP_FAILED,
+SLOT_NOT_FOUND, SLOT_PROPERTY_NOT_SUPPORTED
+
+### 验收
+- `test_stage16_widget_deep.ps1`：8 Parts，26 assertions
+- 正向：创建含root + 5节点树 + 查询 + 属性/slot编辑 + reparent/rename/duplicate/wrap + 编译保存
+- 错误：ROOT_ALREADY_EXISTS, REPARENT_CYCLE, NAME_CONFLICT, PROPERTY_NOT_FOUND, SLOT_NOT_SUPPORTED
+- 结果：26/26 PASS, 0 FAIL
+
+## 项目当前状态
+Handler: 58 (Read 26 / Write 31 / Dangerous 1)
+Resources: 6 (4 static + 2 live)
+测试: Layer 1 TCP + Layer 2 MCP protocol

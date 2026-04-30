@@ -29,3 +29,4 @@
 [2026-04-30] 阶段 14 v2：MCP 协议链路修复（AnyUrl→str 分发，ReadResourceContents 数据类，test_resources_mcp.py 真实 stdio 测试，27/27 通过）
 [2026-04-30] 阶段 14A：资源契约统一 + 测试分层（runtime/status 字段一致化，Layer 1 TCP / Layer 2 MCP protocol 双模，27/27 通过）
 [2026-04-30] 阶段 15A：BridgeClient 并发串行化（threading.Lock）+ README/plan_sync/plan_index/dev_last 收口
+[2026-04-30] 阶段 16 Slice 1-4：Widget 能力完整深化（50→58 Handler，11 新增 + 2 增强，26/26 验收通过）

@@ -23,29 +23,50 @@
 | **10C** | **Python 侧自举配置收敛**（ue_get_mcp_config 自举 / 在线覆盖 / 断连退化 / list_tools 统一配置源） | ✅ |
 | **11B** | **声明式 Blueprint 图重建**（blueprint_apply_spec / blueprint_export_spec，spec → nodes + edges → BP） | ✅ |
 | **12A** | **传输层稳态化与可观测性收口**（runtime status 诊断 + 单客户端策略固定 + Python 错误分类 + 验收脚本） | ✅ |
+| **14** | **MCP Resources 知识层**（4 static + 2 live resources） | ✅ |
+| **14A** | **Resources 契约统一 + 测试分层** | ✅ |
+| **15A** | **BridgeClient 并发串行化** | ✅ |
+| **16** | **Widget 能力完整深化**（50→58 Handler，11 新增 + 2 增强，26/26 验收通过） | ✅ |
 
-## Handler 清单（49 个）
+## Handler 清单（58 个）
 
 ```
-Read (22): ping / get_bridge_runtime_status / editor_info / project_info
-           world_state / list_assets / get_asset_info / get_mcp_config
-           selected_actors / level_actors / get_actor_property
-           get_component_property / list_blueprints / get_bp_info
-           blueprint_get_event_graph_info / blueprint_export_spec
-           list_materials / get_material_info / list_widgets / get_widget_info
-           viewport_screenshot / get_dirty_packages
+Read (26): ping / get_bridge_runtime_status / editor_info / project_info / world_state
+           list_assets / get_asset_info / get_mcp_config / selected_actors
+           level_actors / get_actor_property / get_component_property
+           list_blueprints / get_bp_info / blueprint_get_event_graph_info
+           blueprint_export_spec / list_materials / get_material_info
+           list_widgets / get_widget_info / viewport_screenshot / get_dirty_packages
+           widget_get_property_schema / widget_get_slot_schema / widget_find
 
-Write (26): spawn_actor / set_transform / set_actor_property / save_level
+Write (31): spawn_actor / set_transform / actor_set_property / save_level
             delete_actor / set_component_property / begin/end/undo/redo
             create_blueprint / blueprint_add_variable / blueprint_add_function
-            blueprint_create_actor_class / blueprint_add_event_node
-            blueprint_add_call_function_node / blueprint_connect_pins
-            blueprint_compile_save / blueprint_apply_spec / create_widget_bp
-            widget_add_child / widget_remove_child / widget_set_property
+            blueprint_add_component / blueprint_create_actor_class
+            blueprint_add_event_node / blueprint_add_call_function_node
+            blueprint_connect_pins / blueprint_compile_save / blueprint_apply_spec
+            create_widget_bp / widget_add_child / widget_remove_child
+            widget_set_property / widget_set_root / widget_reparent
+            widget_reorder_child / widget_rename / widget_set_slot_property
+            widget_duplicate / widget_wrap_with_panel
             material_set_scalar/vector/texture_param
 
 Dangerous (1): execute_python_snippet
 ```
+
+## Stage 16 验收测试（2026-04-30）
+
+| 测试域 | 项目 | 结果 |
+|--------|------|------|
+| Part 1 | 创建含 root CanvasPanel 的 Widget BP | ✅ |
+| Part 2 | 构建 5 节点树（VBox/TextBlock/Image/Button/TextBlock） | ✅ |
+| Part 3 | 查询树、find、property_schema、slot_schema | ✅ |
+| Part 4 | 属性编辑（Text）+ Slot 编辑（Padding/HAlign） | ✅ |
+| Part 5 | Reparent, Rename, Duplicate | ✅ |
+| Part 6 | Wrap（Border 包裹 Button） | ✅ |
+| Part 7 | 错误路径（ROOT_ALREADY_EXISTS/CYCLE/CONFLICT/NOT_FOUND/SLOT） | ✅ |
+| Part 8 | 编译保存 + 终态验证 | ✅ |
+| **总计** | **26/26 PASS, 0 FAIL** | ✅ |
 
 ## 11A 验收测试（2026-04-30）
 

@@ -8,7 +8,7 @@
 | 项目文件 | `E:\UEProject\UnrealEditorMCP\UnrealEditorMCP\UnrealEditorMCP.uproject` |
 | 插件 | `UnrealEditorMCP\Plugins\UnrealEditorMCPBridge\` |
 | MCP 端口 | TCP 9876 |
-| Handler 数 | 49（Read 22 / Write 26 / Dangerous 1） |
+| Handler 数 | 58（Read 26 / Write 31 / Dangerous 1） |
 | 连接模型 | **单客户端独占** — 同一时刻只允许一个 TCP 客户端，第二连接被拒绝（`CLIENT_ALREADY_CONNECTED`） |
 | 计划文档 | `.ai/plan/plan.md`（内层） + 外部主计划 `C:\Users\萤火\.local\share\kilo\plans\1777390210726-swift-squid.md` |
 
