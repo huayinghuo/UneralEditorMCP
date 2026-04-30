@@ -308,6 +308,19 @@ TOOL_SCHEMAS = {
             "required": ["asset_path", "func_name"],
         },
     },
+    "blueprint_add_component": {
+        "name": "ue_blueprint_add_component",
+        "description": "Add a component to a Blueprint's SimpleConstructionScript (e.g. StaticMeshComponent, SceneComponent)",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "asset_path": {"type": "string", "description": "Blueprint asset path"},
+                "component_class": {"type": "string", "description": "Component class name, e.g. StaticMeshComponent, SceneComponent, BoxComponent"},
+                "component_name": {"type": "string", "description": "Optional component name (default: class name)"},
+            },
+            "required": ["asset_path", "component_class"],
+        },
+    },
     # ---- Blueprint Graph Editing (Stage 11A) ----
     "blueprint_create_actor_class": {
         "name": "ue_blueprint_create_actor_class",

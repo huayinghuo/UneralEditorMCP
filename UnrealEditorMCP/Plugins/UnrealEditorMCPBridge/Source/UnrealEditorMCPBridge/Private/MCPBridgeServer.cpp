@@ -67,12 +67,13 @@ void FMCPBridgeServer::RegisterHandlers()
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPEndTransactionHandler()));
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPUndoHandler()));
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPRedoHandler()));
-	// Blueprint（5 个）
+	// Blueprint（6 个）
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPListBlueprintsHandler()));
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPGetBlueprintInfoHandler()));
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPCreateBlueprintHandler()));
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPAddBlueprintVariableHandler()));
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPAddBlueprintFunctionHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPBlueprintAddComponentHandler()));
 	// Blueprint Graph 编辑（6 个）
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPCreateActorBlueprintClassHandler()));
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPGetBlueprintEventGraphInfoHandler()));

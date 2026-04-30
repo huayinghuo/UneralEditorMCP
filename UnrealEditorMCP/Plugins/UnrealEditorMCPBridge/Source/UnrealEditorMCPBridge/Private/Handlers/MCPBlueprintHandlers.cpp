@@ -8,6 +8,8 @@
 #include "EdGraph/EdGraphSchema.h"
 #include "EdGraphSchema_K2.h"
 #include "UObject/SavePackage.h"
+#include "Engine/SimpleConstructionScript.h"
+#include "Engine/SCS_Node.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogMCPBlueprint, Log, All);
 
@@ -306,6 +308,87 @@ bool FMCPAddBlueprintFunctionHandler::Execute(TSharedPtr<FJsonObject> Payload, T
 	OutResult = MakeShareable(new FJsonObject());
 	OutResult->SetStringField(TEXT("blueprint"), BP->GetName());
 	OutResult->SetStringField(TEXT("func_name"), NewGraph->GetName());
+	OutResult->SetBoolField(TEXT("added"), true);
+	return true;
+}
+
+// ====== BlueprintAddComponent（新增：向 BP 的 SCS 添加组件）======
+bool FMCPBlueprintAddComponentHandler::Execute(TSharedPtr<FJsonObject> Payload, TSharedPtr<FJsonObject>& OutResult, FString& OutErrorCode, FString& OutErrorMessage)
+{
+	// 1. 参数校验
+	FString AssetPath;
+	if (!Payload.IsValid() || !Payload->TryGetStringField(TEXT("asset_path"), AssetPath))
+	{
+		MCPBridgeHelpers::BuildErrorResponse(TEXT("MISSING_PARAM"), TEXT("payload.asset_path is required"), OutErrorCode, OutErrorMessage);
+		return false;
+	}
+
+	FString ComponentClassName;
+	if (!Payload->TryGetStringField(TEXT("component_class"), ComponentClassName))
+	{
+		MCPBridgeHelpers::BuildErrorResponse(TEXT("MISSING_PARAM"), TEXT("payload.component_class is required"), OutErrorCode, OutErrorMessage);
+		return false;
+	}
+
+	// 2. 加载 Blueprint
+	UBlueprint* BP = LoadObject<UBlueprint>(nullptr, *AssetPath);
+	if (!BP)
+	{
+		MCPBridgeHelpers::BuildErrorResponse(TEXT("BP_NOT_FOUND"), FString::Printf(TEXT("Blueprint not found: %s"), *AssetPath), OutErrorCode, OutErrorMessage);
+		return false;
+	}
+
+	// 3. 查找组件类
+	UClass* ComponentClass = nullptr;
+	// 尝试完整路径：/Script/Engine.StaticMeshComponent
+	if (!ComponentClass)
+	{
+		ComponentClass = FindFirstObject<UClass>(*(TEXT("Class /Script/Engine.") + ComponentClassName), EFindFirstObjectOptions::None, ELogVerbosity::NoLogging);
+	}
+	if (!ComponentClass)
+	{
+		// 尝试短类名查找
+		ComponentClass = FindFirstObject<UClass>(*ComponentClassName, EFindFirstObjectOptions::None, ELogVerbosity::NoLogging);
+	}
+	if (!ComponentClass || !ComponentClass->IsChildOf(UActorComponent::StaticClass()))
+	{
+		MCPBridgeHelpers::BuildErrorResponse(TEXT("CLASS_NOT_FOUND"), FString::Printf(TEXT("Component class not found or not a component: %s"), *ComponentClassName), OutErrorCode, OutErrorMessage);
+		return false;
+	}
+
+	// 4. 组件名称（可选，默认用类名）
+	FString ComponentName;
+	if (!Payload->TryGetStringField(TEXT("component_name"), ComponentName) || ComponentName.IsEmpty())
+	{
+		ComponentName = ComponentClassName;
+	}
+
+	// 5. 获取或创建 SimpleConstructionScript
+	BP->Modify();
+	if (!BP->SimpleConstructionScript)
+	{
+		BP->SimpleConstructionScript = NewObject<USimpleConstructionScript>(BP, NAME_None, RF_Transactional);
+	}
+
+	// 6. 创建 SCS 节点
+	USCS_Node* NewNode = BP->SimpleConstructionScript->CreateNode(ComponentClass, FName(*ComponentName));
+	if (!NewNode)
+	{
+		MCPBridgeHelpers::BuildErrorResponse(TEXT("CREATE_FAILED"), FString::Printf(TEXT("Failed to create SCS node for component class: %s"), *ComponentClassName), OutErrorCode, OutErrorMessage);
+		return false;
+	}
+
+	// 7. 添加到 SCS 根节点
+	BP->SimpleConstructionScript->AddNode(NewNode);
+
+	// 8. 编译 Blueprint
+	FKismetEditorUtilities::CompileBlueprint(BP);
+	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(BP);
+
+	OutResult = MakeShareable(new FJsonObject());
+	OutResult->SetStringField(TEXT("blueprint"), BP->GetName());
+	OutResult->SetStringField(TEXT("component_name"), NewNode->GetVariableName().ToString());
+	OutResult->SetStringField(TEXT("component_class"), ComponentClassName);
 	OutResult->SetBoolField(TEXT("added"), true);
 	return true;
 }
