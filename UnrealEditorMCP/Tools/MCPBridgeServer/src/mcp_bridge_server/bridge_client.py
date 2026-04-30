@@ -1,6 +1,7 @@
 import json
 import logging
 import socket
+import threading
 import uuid
 
 # 最大响应匹配尝试次数，防止串包时无限循环
@@ -31,6 +32,7 @@ class UEBridgeClient:
         self._sock = None          # TCP socket 实例
         self._buffer = ""          # 接收缓冲区（累积未完成的 JSON 行）
         self._token = token        # 可选共享令牌（用于写/危险操作鉴权）
+        self._lock = threading.Lock()  # 实例级串行化锁：防止并发 send() 共享 socket/buffer
 
     def connect(self):
         """建立 TCP 连接，清空缓冲区；连接失败时抛出 UEBridgeError"""
@@ -80,30 +82,34 @@ class UEBridgeClient:
         payload: 请求参数字典，可选
         返回: 解析后的 JSON 响应字典 { id, ok, result, error }
         抛出: UEBridgeError（带错误分类码）
+
+        线程安全：实例级 Lock 保证同一时刻只有一个请求在读/写共享 socket 和 _buffer，
+        消除 list_tools / call_tool / read_resource 并发调用时的串包/竞争风险。
         """
-        request_id = str(uuid.uuid4())   # 自动生成唯一请求 ID
-        payload = payload or {}
-        # 注入 token（若已配置）
-        if self._token:
-            payload["_token"] = self._token
-        request = {
-            "id": request_id,
-            "action": action,
-            "payload": payload,
-        }
-        try:
-            self._ensure_connected()
-            # JSON Lines 格式：JSON + 换行
-            data = json.dumps(request) + "\n"
-            self._sock.sendall(data.encode("utf-8"))
-            return self._read_response(request_id)
-        except UEBridgeError:
-            # 已分类的错误直接上抛，不做二次包装
-            self.disconnect()
-            raise
-        except (socket.timeout, OSError) as e:
-            self.disconnect()
-            raise UEBridgeError("CONNECTION_LOST", f"UE bridge connection lost: {e}")
+        with self._lock:
+            request_id = str(uuid.uuid4())   # 自动生成唯一请求 ID
+            payload = payload or {}
+            # 注入 token（若已配置）
+            if self._token:
+                payload["_token"] = self._token
+            request = {
+                "id": request_id,
+                "action": action,
+                "payload": payload,
+            }
+            try:
+                self._ensure_connected()
+                # JSON Lines 格式：JSON + 换行
+                data = json.dumps(request) + "\n"
+                self._sock.sendall(data.encode("utf-8"))
+                return self._read_response(request_id)
+            except UEBridgeError:
+                # 已分类的错误直接上抛，不做二次包装
+                self.disconnect()
+                raise
+            except (socket.timeout, OSError) as e:
+                self.disconnect()
+                raise UEBridgeError("CONNECTION_LOST", f"UE bridge connection lost: {e}")
 
     def _read_response(self, expected_id):
         """

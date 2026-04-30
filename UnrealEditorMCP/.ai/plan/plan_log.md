@@ -25,3 +25,7 @@
 [2026-04-30] 阶段 12 启动：传输层与部署能力评估（评估矩阵 + 决策框架，非实现）
 [2026-04-30] 仓库计划镜像：`plan_sync.md` 创建，外部 plan 为主，repo 内为精简协作镜像
 [2026-04-30] 阶段 12A 实现：传输层稳态化与可观测性收口（8 文件变更，48→49 Handler，新增 get_bridge_runtime_status + last error 追踪 + 单客户端独占固定 + Python UEBridgeError 错误分类 + test_stage12a.ps1 验收脚本）
+[2026-04-30] 阶段 14 实现：MCP Resources 知识层（4 static + 2 live resources，resources.py + test_stage14_resources.ps1，22/22 通过）
+[2026-04-30] 阶段 14 v2：MCP 协议链路修复（AnyUrl→str 分发，ReadResourceContents 数据类，test_resources_mcp.py 真实 stdio 测试，27/27 通过）
+[2026-04-30] 阶段 14A：资源契约统一 + 测试分层（runtime/status 字段一致化，Layer 1 TCP / Layer 2 MCP protocol 双模，27/27 通过）
+[2026-04-30] 阶段 15A：BridgeClient 并发串行化（threading.Lock）+ README/plan_sync/plan_index/dev_last 收口

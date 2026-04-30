@@ -1,64 +1,33 @@
 # Last Operation
 
-Session: 2026-04-30 10:36
-Phase: 阶段 12A — 传输层稳态化与可观测性收口
-Status: ✅ 完成，49 Handler（新增 1 个诊断查询）
+Session: 2026-04-30 13:34
+Phase: 阶段 15A — BridgeClient 并发串行化 + 项目镜像收口
+Status: ✅ 完成，49 Handler + 6 Resources，稳定性基线建立
 
-## Slice A — 状态面补齐
+## 阶段 15A-A — Python 桥接串行化
 
-- 新增 `FMCPGetBridgeRuntimeStatusHandler`（Read 类第 22 个，总计第 49 个 Handler）
-  - 返回字段：`server_status` / `port` / `token_enabled` / `client_connected` / `last_error_code` / `last_error_message` / `transport_mode` / `bind_address`
-  - 注册在 `MCPQueryHandlers.h/cpp`，通过 `FMCPBridgeServer*` 读取 server 状态
-- `MCPBridgeServer` 新增 last error 追踪：
-  - `SetLastError(Code, Message)` — 网络线程写入
-  - `GetLastErrorCode()` / `GetLastErrorMessage()` — Game Thread 可读
-  - `LastErrorCS` 保护字段线程安全
-  - 所有 Run() 错误路径（SOCKET_SUBSYSTEM_FAILED / CREATE_SOCKET_FAILED / BIND_FAILED / LISTEN_FAILED）均记录 last error
-- 模块启动 warning 日志结构化：含 `status=%d, port=%d, last_error=[%s] %s`
-- `tool_schemas.py` 新增 `get_bridge_runtime_status` schema（ue_ 前缀映射）
+- `bridge_client.py`：`UEBridgeClient.__init__` 新增 `self._lock = threading.Lock()`
+- `send()` 全流程（ensure_connected / sendall / _read_response / disconnect）置于 `with self._lock:` 内部
+- 消除 `list_tools` / `call_tool` / `read_resource` 并发调用时的共享 socket/buffer 竞争风险
+- 不改对外 API，不改错误码，最小改动
 
-## Slice B — 单客户端语义固定
+## 阶段 15A-B — 文档与镜像收口
 
-- `Run()` 中 Accept 逻辑修改：
-  - 无活跃客户端时正常 Accept
-  - 已有活跃客户端时：Accept → 发送 `CLIENT_ALREADY_CONNECTED` 错误响应 → 关闭 Socket
-  - 日志：`Warning: Rejected second client connection from ...`
-- `MCPBridgeServer.h` 类注释写明单客户端独占模型
-- `plan.md` / `plan_sync.md` 文档化单客户端限制
+- `README.md`：48→49 Handler，目录新增 `resources.py`
+- `plan_sync.md`：当前主线更新为 14/14A 已完成
+- `plan_index.md`：当前阶段 14A 完成
+- `dev_last.md`：本文件覆盖
+- `plan_log.md` / `log.md`：追加 15A 变更记录
 
-## Slice C — Python 错误诊断收口
+## 项目当前基线
 
-- `bridge_client.py`：
-  - 新增 `UEBridgeError(ConnectionError)` 基类，携带 `.code` 分类码
-  - 错误分类：`CONNECT_TIMEOUT` / `CONNECT_REFUSED` / `CONNECT_FAILED` / `READ_TIMEOUT` / `PEER_CLOSED` / `CLIENT_ALREADY_CONNECTED` / `RESPONSE_MISMATCH` / `CONNECTION_LOST`
-  - `connect()` 区分 timeout / refused / OSError
-  - `_read_response()` 检测 `CLIENT_ALREADY_CONNECTED` 响应并上抛
-  - 跳过不匹配响应时 debug 日志
-- `server.py`：
-  - `list_tools()` 在线失败时 warning 日志（含错误码）；离线时 info 级别注明 bootstrap fallback
-  - `call_tool()` 根据 `UEBridgeError.code` 映射到差异化用户可读提示
-  - bootstrap 降级契约不变（仅 `ue_get_mcp_config` 可离线返回）
-  - 保持 `asyncio.to_thread()` 包装阻塞 I/O
+```
+pouncing-spell 提交历史：
+c3e1569  Stage 14A: resources contract stabilization and test portability
+4213b7b  Stage 14 v2: fix MCP resources protocol chain with real stdio test
+22fc0cd  Stage 14: MCP Resources knowledge layer (Static + Live)
+d453b3d  Stage 12A: transport layer stabilization and observability closure
 
-## Slice D — 验收脚本
-
-- 新建 `tests/test_stage12a.ps1`：
-  - Part 1: ping / get_bridge_runtime_status / get_mcp_config 基本联通
-  - Part 2: Runtime Status 在 Connected / Listening 两种状态下字段正确
-  - Part 3: 错误路径（非法 JSON→PARSE_ERROR、缺失 action→MISSING_ACTION、未知 action）
-  - Part 4: 单客户端独占（第二连接被拒绝 + 第一客户端不受影响）
-  - Part 5: 断连恢复（disconnect→Listening→新连接可用）
-  - 含 PASS/FAIL 计数和断言机制
-
-## 变更文件清单（8 个文件）
-
-| 文件 | 变更类型 |
-|------|----------|
-| `Public/MCPBridgeServer.h` | 新增字段/方法/注释 |
-| `Private/MCPBridgeServer.cpp` | last error 记录 + 第二连接拒绝 + 新 Handler 注册 |
-| `Public/Handlers/MCPQueryHandlers.h` | 新增 Handler 类声明 |
-| `Private/Handlers/MCPQueryHandlers.cpp` | 新增 Handler 实现 |
-| `Private/UnrealEditorMCPBridgeModule.cpp` | startup warning 结构化 |
-| `Tools/.../bridge_client.py` | UEBridgeError 错误分类 |
-| `Tools/.../server.py` | 日志增强 + 错误提示映射 |
-| `Tools/.../tool_schemas.py` | 新增 schema |
+能力面：49 Handler + 6 Resources（4 static + 2 live）+ 双层测试模型（Layer 1 TCP / Layer 2 MCP）
+稳定性：单客户端独占 + CLIENT_ALREADY_CONNECTED + last error 追踪 + BridgeClient 并发串行化
+```

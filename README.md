@@ -116,14 +116,15 @@ UnrealEditorMCP/                    ← Git 仓库根目录
 │   │   ├── Config/                      # ini 配置（Token/Port）
 │   │   ├── Source/UnrealEditorMCPBridge/
 │   │   │   ├── Public/                  # Handler 接口、调度器、Helpers
-│   │   │   │   └── Handlers/            # 11 个领域文件（48 Handler）
+│   │   │   │   └── Handlers/            # 11 个领域文件（49 Handler + 1 诊断查询）
 │   │   │   └── Private/                 # 实现
 │   │   └── Resources/
 │   ├── Tools/MCPBridgeServer/           # Python MCP Server
 │   │   ├── src/mcp_bridge_server/
 │   │   │   ├── server.py                # MCP 入口
 │   │   │   ├── bridge_client.py         # TCP 客户端
-│   │   │   └── tool_schemas.py          # 48 tool schema 注册表
+│   │   │   ├── resources.py             # MCP Resources 知识层（4 static + 2 live）
+│   │   │   └── tool_schemas.py          # 49 tool schema 注册表
 │   │   └── tests/
 │   └── .ai/                             # 项目治理（plan / log / dev）
 └── Config/                              # 项目工程配置
