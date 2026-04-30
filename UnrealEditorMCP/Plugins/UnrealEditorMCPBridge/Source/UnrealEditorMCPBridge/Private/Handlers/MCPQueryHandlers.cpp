@@ -4,6 +4,7 @@
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Misc/EngineVersion.h"
 #include "Editor.h"
+#include "Selection.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/Actor.h"
@@ -161,7 +162,7 @@ bool FMCPGetAssetInfoHandler::Execute(TSharedPtr<FJsonObject> Payload, TSharedPt
 	return true;
 }
 
-// ====== GetMCPConfig（新增：统一 action registry）======
+// ====== GetMCPConfig（统一 action registry）======
 bool FMCPGetMCPConfigHandler::Execute(TSharedPtr<FJsonObject> Payload, TSharedPtr<FJsonObject>& OutResult, FString& OutErrorCode, FString& OutErrorMessage)
 {
 	OutResult = MakeShareable(new FJsonObject());
@@ -180,6 +181,40 @@ bool FMCPGetMCPConfigHandler::Execute(TSharedPtr<FJsonObject> Payload, TSharedPt
 		OutResult->SetStringField(TEXT("bridge_protocol"), TEXT("TCP/JSON Lines"));
 		OutResult->SetStringField(TEXT("ue_version"), FEngineVersion::Current().ToString());
 	}
+
+	return true;
+}
+
+// ====== GetBridgeRuntimeStatus（阶段 12A 诊断查询）======
+bool FMCPGetBridgeRuntimeStatusHandler::Execute(TSharedPtr<FJsonObject> Payload, TSharedPtr<FJsonObject>& OutResult, FString& OutErrorCode, FString& OutErrorMessage)
+{
+	if (!Server)
+	{
+		MCPBridgeHelpers::BuildErrorResponse(TEXT("INTERNAL_ERROR"), TEXT("Server reference is null"), OutErrorCode, OutErrorMessage);
+		return false;
+	}
+
+	OutResult = MakeShareable(new FJsonObject());
+
+	// 状态字符串映射
+	const TCHAR* StatusStr = TEXT("Unknown");
+	switch (Server->GetStatus())
+	{
+	case EMCPBridgeServerStatus::Unstarted:  StatusStr = TEXT("Unstarted");  break;
+	case EMCPBridgeServerStatus::Listening:  StatusStr = TEXT("Listening");  break;
+	case EMCPBridgeServerStatus::Connected:  StatusStr = TEXT("Connected");  break;
+	case EMCPBridgeServerStatus::Error:      StatusStr = TEXT("Error");      break;
+	case EMCPBridgeServerStatus::Stopped:    StatusStr = TEXT("Stopped");    break;
+	}
+
+	OutResult->SetStringField(TEXT("server_status"), StatusStr);
+	OutResult->SetNumberField(TEXT("port"), Server->GetServerPort());
+	OutResult->SetBoolField(TEXT("token_enabled"), !Server->GetToken().IsEmpty());
+	OutResult->SetBoolField(TEXT("client_connected"), Server->IsClientConnected());
+	OutResult->SetStringField(TEXT("last_error_code"), Server->GetLastErrorCode());
+	OutResult->SetStringField(TEXT("last_error_message"), Server->GetLastErrorMessage());
+	OutResult->SetStringField(TEXT("transport_mode"), TEXT("tcp-jsonlines"));
+	OutResult->SetStringField(TEXT("bind_address"), TEXT("127.0.0.1"));
 
 	return true;
 }

@@ -8,7 +8,7 @@
 
 ## 当前阶段（2026-04-30）
 
-**当前主线：阶段 12 — 传输层与部署能力评估**
+**当前主线：阶段 12A — 传输层稳态化与可观测性收口** ✅ 已完成
 
 ### 已完成里程碑
 
@@ -28,14 +28,24 @@
 | 13 仓库治理（.gitignore / README.md） | ✅ |
 | 10C Python 自举配置收敛（断连退化） | ✅ |
 | 11B 声明式 Blueprint 图重建（apply_spec / export_spec） | ✅ |
+| 12A 传输层稳态化与可观测性收口 | ✅ |
 
 ### 当前不在做的
 
-- 阶段 13 / 11A / 10B 不再作为活跃阶段
+- 不新增大批业务 Handler（已从 48 → 49，仅新增 1 个诊断查询）
+- 不切换 HTTP/SSE/WebSocket 传输协议
+- 不实现 UE 侧真正多客户端并发会话池（已固定为单客户端独占模型）
+- 不做远程部署、TLS、LAN 暴露
 - 多 Graph 类型 / 更新既有 Blueprint / 更多节点白名单（暂不扩展）
-- transport 重写（HTTP/SSE/Native Server）暂不作为实现目标
 - 为所有 AI 客户端各写一套 skill（已拒绝，改为 P2 Resources 方案）
 - 仓库内完整计划与外部主计划双向维护（单向同步，外部为主）
+
+### 12A 关键变更
+
+- **单客户端模型**：已文档化，第二连接被显式拒绝（`CLIENT_ALREADY_CONNECTED`），不再依赖隐式 accept 时机
+- **运行时诊断**：新增 `get_bridge_runtime_status`（49th Handler），暴露 server_status / last_error / client_connected / transport_mode 等字段
+- **Python 错误分类**：`UEBridgeError` 携带分类码（CONNECT_TIMEOUT / READ_TIMEOUT / PEER_CLOSED / CLIENT_ALREADY_CONNECTED / RESPONSE_MISMATCH）
+- **启动失败可见**：`SetLastError()` 记录 Bind/Listen 错误，模块 startup warning 结构化输出
 
 ---
 
@@ -53,15 +63,15 @@ Unreal Engine 5.3 Editor
 
 - UE 插件负责编辑器生命周期、请求分发、Game Thread 调度
 - Python Server 负责 MCP 协议、tool 注册、客户端集成
-- 仅本地回环，单客户端 TCP 连接
+- 仅本地回环，**单客户端独占** TCP 连接（第二连接被拒绝并返回 CLIENT_ALREADY_CONNECTED）
 
 ---
 
-## 能力清单（48 Handler）
+## 能力清单（49 Handler）
 
 | 类别 | 数量 | 工具 |
 |------|------|------|
-| 编辑器状态 | 6 | ping, editor_info, project_info, world_state, get_mcp_config, dirty_packages |
+| 编辑器状态 | 7 | ping, get_bridge_runtime_status, editor_info, project_info, world_state, get_mcp_config, dirty_packages |
 | 资产浏览 | 6 | list_assets, asset_info, list_blueprints, list_materials, list_widgets, widget_info |
 | Actor 操作 | 6 | selected_actors, level_actors, get_actor_property, get_component_property, spawn, delete |
 | 编辑操作 | 5 | set_transform, set_actor_property, set_component_property, save_level, viewport_screenshot |
@@ -123,6 +133,6 @@ UnrealEditorMCP/                          ← Git 仓库根
 2. 权限：三级分类（Read/Write/Dangerous）+ 可选 token，默认开发模式开放
 3. Blueprint：11A 受控命令面 → 11B 声明式 spec 重建，不做通用图编辑器
 4. 安全：仅 127.0.0.1，不做远程暴露
-5. 传输层：保持当前 TCP，不预设切换 HTTP/SSE（阶段 12 为评估而非实现）
+5. 传输层：保持当前 TCP，不预设切换 HTTP/SSE（阶段 12A 已收口：单客户端独占 + 运行时诊断 + 错误分类）
 6. 知识层：拒绝客户端专属 skill，改为 P2 MCP Resources 方案
 7. 计划：外部 Kilo plan 为主，repo 内 plan_sync.md 为单向协作镜像

@@ -8,7 +8,8 @@
 | 项目文件 | `E:\UEProject\UnrealEditorMCP\UnrealEditorMCP\UnrealEditorMCP.uproject` |
 | 插件 | `UnrealEditorMCP\Plugins\UnrealEditorMCPBridge\` |
 | MCP 端口 | TCP 9876 |
-| Handler 数 | 48（Read 21 / Write 26 / Dangerous 1） |
+| Handler 数 | 49（Read 22 / Write 26 / Dangerous 1） |
+| 连接模型 | **单客户端独占** — 同一时刻只允许一个 TCP 客户端，第二连接被拒绝（`CLIENT_ALREADY_CONNECTED`） |
 | 计划文档 | `.ai/plan/plan.md`（内层） + 外部主计划 `C:\Users\萤火\.local\share\kilo\plans\1777390210726-swift-squid.md` |
 
 ---
@@ -129,6 +130,58 @@ Write-Host "ping ok=$($r.ok)"
 2. **ping 联通** — ok=True
 3. **正向链路** — 新 action 的典型调用路径 ok=True、返回结构符合预期
 4. **错误路径** — 至少 3 个非法输入分别返回 ok=False + 正确错误码
+
+---
+
+## 2.6 运行时诊断
+
+### 查询桥接服务状态
+
+```powershell
+$r = Send-Request "get_bridge_runtime_status"
+# 返回示例:
+# {
+#   "server_status": "Connected",
+#   "port": 9876,
+#   "token_enabled": false,
+#   "client_connected": true,
+#   "last_error_code": "",
+#   "last_error_message": "",
+#   "transport_mode": "tcp-jsonlines",
+#   "bind_address": "127.0.0.1"
+# }
+```
+
+### 状态枚举含义
+
+| server_status | 含义 |
+|---------------|------|
+| `Unstarted` | Start() 尚未调用 |
+| `Listening` | Bind+Listen 成功，等待客户端连接 |
+| `Connected` | 有客户端已连接 |
+| `Error` | Bind/Listen 阶段失败（查看 last_error_code） |
+| `Stopped` | 已停止服务 |
+
+### 单客户端约束
+
+- 同一时刻仅允许一个 TCP 客户端连接
+- 第二客户端连接会被 Accept 后立即返回 `CLIENT_ALREADY_CONNECTED` 错误并关闭 Socket
+- Python 侧 `UEBridgeClient` 收到此错误后抛出 `UEBridgeError(code="CLIENT_ALREADY_CONNECTED")`
+- 断开旧连接后服务自动恢复为 `Listening` 状态，新客户端可正常接入
+
+### Python 侧错误分类
+
+`UEBridgeError` 携带 `code` 属性用于程序化判断：
+
+| code | 触发条件 |
+|------|----------|
+| `CONNECT_TIMEOUT` | TCP 连接超时（UE 未启动或插件未加载） |
+| `CONNECT_REFUSED` | TCP 连接被拒绝（端口无监听） |
+| `READ_TIMEOUT` | 读取响应超时（UE 繁忙或无响应） |
+| `PEER_CLOSED` | UE 侧关闭连接 |
+| `CLIENT_ALREADY_CONNECTED` | 第二客户端被拒绝 |
+| `RESPONSE_MISMATCH` | 响应 ID 不匹配（协议串包） |
+| `CONNECTION_LOST` | 发送或读取过程中连接丢失 |
 
 ---
 

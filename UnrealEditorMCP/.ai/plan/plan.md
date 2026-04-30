@@ -22,15 +22,16 @@
 | 13 | **仓库治理**（.gitignore / .editorconfig / .gitattributes / README.md） | ✅ |
 | **10C** | **Python 侧自举配置收敛**（ue_get_mcp_config 自举 / 在线覆盖 / 断连退化 / list_tools 统一配置源） | ✅ |
 | **11B** | **声明式 Blueprint 图重建**（blueprint_apply_spec / blueprint_export_spec，spec → nodes + edges → BP） | ✅ |
-| **12** | **传输层与部署能力评估**（评估矩阵 / 决策框架 / 首轮默认推荐，非实现） | 🔄 进行中 |
+| **12A** | **传输层稳态化与可观测性收口**（runtime status 诊断 + 单客户端策略固定 + Python 错误分类 + 验收脚本） | ✅ |
 
-## Handler 清单（48 个）
+## Handler 清单（49 个）
 
 ```
-Read (21): ping / editor_info / project_info / world_state / list_assets
-           get_asset_info / get_mcp_config / selected_actors / level_actors
-           get_actor_property / get_component_property / list_blueprints
-           get_bp_info / blueprint_get_event_graph_info / blueprint_export_spec
+Read (22): ping / get_bridge_runtime_status / editor_info / project_info
+           world_state / list_assets / get_asset_info / get_mcp_config
+           selected_actors / level_actors / get_actor_property
+           get_component_property / list_blueprints / get_bp_info
+           blueprint_get_event_graph_info / blueprint_export_spec
            list_materials / get_material_info / list_widgets / get_widget_info
            viewport_screenshot / get_dirty_packages
 
@@ -109,6 +110,16 @@ Dangerous (1): execute_python_snippet
 | PIN_NOT_FOUND | pin_name 对应引脚不存在 | blueprint_connect_pins |
 | SCHEMA_NOT_FOUND | Graph Schema 为空 | blueprint_connect_pins |
 | COMPILE_FAILED | 编译后 Status == BS_Error | blueprint_compile_save |
+| SOCKET_SUBSYSTEM_FAILED | 无法获取平台 Socket 子系统 | Server Run() |
+| CREATE_SOCKET_FAILED | 创建监听 Socket 失败 | Server Run() |
+| BIND_FAILED | 绑定端口失败 | Server Run() |
+| LISTEN_FAILED | 开始监听失败 | Server Run() |
+| CLIENT_ALREADY_CONNECTED | 第二客户端被拒绝（单客户端独占模型） | Server Accept |
+| CONNECT_TIMEOUT | Python 客户端连接超时 | bridge_client.py |
+| CONNECT_REFUSED | Python 客户端连接被拒绝 | bridge_client.py |
+| READ_TIMEOUT | Python 客户端读取超时 | bridge_client.py |
+| PEER_CLOSED | UE 侧关闭连接 | bridge_client.py |
+| RESPONSE_MISMATCH | 响应 ID 不匹配（协议串包） | bridge_client.py |
 
 ---
 
@@ -279,6 +290,87 @@ if name == "ue_get_mcp_config":
 
 ---
 
+## 阶段 12A：传输层稳态化与可观测性收口（✅ 已完成）
+
+### 目标
+
+在不重写传输协议的前提下，把当前 `localhost TCP JSON Lines + 外部 Python MCP Server` 方案补成更稳定、更可诊断的闭环。
+
+### 明确范围
+
+**做**：
+1. 补齐运行时状态可见性（`get_bridge_runtime_status` action）
+2. 收敛连接失败/启动失败/断连恢复的语义（`LastErrorCode/LastErrorMessage`）
+3. 固定单客户端独占模型，第二连接被显式拒绝（`CLIENT_ALREADY_CONNECTED`）
+4. Python 侧连接错误分类收敛（`UEBridgeError` 携带分类码）
+5. PowerShell 验收脚本覆盖在线/离线/断连/重复连接场景
+
+**不做**：
+- 不新增大批业务 Handler（仅新增 1 个诊断查询）
+- 不切换 HTTP/SSE/WebSocket
+- 不实现 UE 侧真正多客户端并发会话池
+- 不做远程部署、TLS、LAN 暴露
+
+### 核心交付
+
+| # | 交付物 | 文件 |
+|---|--------|------|
+| 1 | `get_bridge_runtime_status` Handler | C++: `MCPQueryHandlers.h/cpp` / Python: `tool_schemas.py` |
+| 2 | `SetLastError` / `GetLastErrorCode` / `GetLastErrorMessage` | `MCPBridgeServer.h/cpp` |
+| 3 | 单客户端拒绝策略（`CLIENT_ALREADY_CONNECTED`） | `MCPBridgeServer.cpp:222-241` |
+| 4 | Python `UEBridgeError` 错误分类（CONNECT_TIMEOUT / READ_TIMEOUT / PEER_CLOSED 等） | `bridge_client.py` |
+| 5 | 模块 startup warning 结构化（含 status + last error） | `UnrealEditorMCPBridgeModule.cpp` |
+| 6 | `server.py` list_tools/call_tool 日志增强 | `server.py` |
+| 7 | 阶段 12A 验收脚本 | `tests/test_stage12a.ps1` |
+
+### 运行时诊断字段
+
+```json
+{
+  "server_status": "Listening|Connected|Error|Stopped|Unstarted",
+  "port": 9876,
+  "token_enabled": false,
+  "client_connected": true,
+  "last_error_code": "BIND_FAILED",
+  "last_error_message": "Failed to bind to 127.0.0.1:9876",
+  "transport_mode": "tcp-jsonlines",
+  "bind_address": "127.0.0.1"
+}
+```
+
+### 单客户端模型
+
+- 同一时刻只允许一个 TCP 客户端连接
+- 第二客户端到来时：Accept → 发送 `CLIENT_ALREADY_CONNECTED` 错误 → 关闭 Socket
+- 日志：`Warning: Rejected second client connection from ...`
+- Python 客户端收到 `CLIENT_ALREADY_CONNECTED` 后抛出 `UEBridgeError`
+
+### 12A 变更文件（8 个）
+
+| 文件 | 变更 |
+|------|------|
+| `Public/MCPBridgeServer.h` | 新增 `IsClientConnected` / `GetServerPort` / `SetLastError` / `GetLastError*`；新增 `LastErrorCode/Message` + `LastErrorCS` 字段；更新类注释 |
+| `Private/MCPBridgeServer.cpp` | 所有错误路径记录 last error；第二客户端拒绝逻辑；注册 `FMCPGetBridgeRuntimeStatusHandler`；`GetLastError*` 实现 |
+| `Public/Handlers/MCPQueryHandlers.h` | 新增 `FMCPGetBridgeRuntimeStatusHandler` 类声明 |
+| `Private/Handlers/MCPQueryHandlers.cpp` | 实现 `FMCPGetBridgeRuntimeStatusHandler::Execute()` |
+| `Private/UnrealEditorMCPBridgeModule.cpp` | 启动 warning 日志结构化（含 status/port/last_error） |
+| `Tools/.../bridge_client.py` | `UEBridgeError` 基类 + 连接/读取/对端关闭错误分类；`CLIENT_ALREADY_CONNECTED` 检测 |
+| `Tools/.../server.py` | `list_tools` / `call_tool` 日志增强；`UEBridgeError` 错误码到用户可读提示映射 |
+| `Tools/.../tool_schemas.py` | 新增 `get_bridge_runtime_status` schema |
+
+### 验收标准
+
+- [x] `get_bridge_runtime_status` 返回 `server_status` / `port` / `token_enabled` / `client_connected` / `last_error_*` / `transport_mode` / `bind_address`
+- [x] 启动失败时 `last_error_code` 为非空（如 `BIND_FAILED`），不依赖 UE 日志判断
+- [x] 单客户端：第二连接被拒绝，返回 `CLIENT_ALREADY_CONNECTED` 错误
+- [x] Python 侧 `UEBridgeError` 携带分类码（`CONNECT_TIMEOUT` / `READ_TIMEOUT` / `PEER_CLOSED` 等）
+- [x] `server.py` 错误提示根据分类码给出差异化用户可读信息
+- [x] `list_tools` 在线/离线切换有 debug 日志
+- [x] 不破坏现有 10C / 11A / 11B 行为
+- [x] PowerShell 验收脚本覆盖在线/离线/断连/重复连接 4 类场景 + 至少 3 条错误路径
+
+---
+
 ## 修复任务追踪（Review Findings 对照）
 
 ### 一次 Review（§4.2）— 5 项
@@ -286,7 +378,7 @@ if name == "ue_get_mcp_config":
 | # | 发现 | 严重度 | 状态 | 证据 |
 |---|------|--------|------|------|
 | 1 | 协议关联与重连正确性不足 | P1 | ⚠️ 部分 | Python `bridge_client.py:91` ID 校验 ✅；UE 侧单全局 socket ⚠️（架构限制，单连接模式） |
-| 2 | 服务启动健康状态不可见 | P1 | ⚠️ 未修 | `Start()` 仅检查线程创建，Bind/Listen 在后台线程，失败无回调 |
+| 2 | 服务启动健康状态不可见 | P1 | ✅ 阶段 12A | `SetLastError()` 记录 Bind/Listen 错误；`get_bridge_runtime_status` 暴露 last_error；模块启动轮询含结构化 warning |
 | 3 | Python MCP async 内部阻塞 socket I/O | P1 | ✅ | `server.py:76` — `asyncio.to_thread()` 将 I/O 卸到线程池 |
 | 4 | 反射属性与事务语义不可靠 | P1 | ✅ | `MCPBridgeHelpers.cpp:118-120` — Modify() 先于 ImportText；返回值检查 |
 | 5 | transform/transaction 语义不一致 | P2 | ⚠️ 已知 | Rotation 映射 `(Y,Z,X)` → 约定（`MCPBridgeHelpers.h:31`）；undo/redo 已修复 |
@@ -325,6 +417,6 @@ if name == "ue_get_mcp_config":
 
 | # | 项目 | 说明 |
 |---|------|------|
-| A | 服务启动健康状态 | `Start()` 无 Bind/Listen 失败反馈，建议添加 `GetServerStatus()` 或回调 |
-| B | UE 侧多连接支持 | 当前单全局 socket 设计，后续需支持客户端重连共存 |
+| A | ~~服务启动健康状态~~ | ✅ 阶段 12A 已修复：`SetLastError()` / `GetLastErrorCode/Message()` / `get_bridge_runtime_status` 诊断接口 |
+| B | ~~UE 侧多连接支持~~ | ✅ 阶段 12A 已收敛：明确定义为单客户端独占模型，第二连接被拒绝并返回 `CLIENT_ALREADY_CONNECTED` |
 | C | Rotation 映射统一 | 当前 `FRotator(Y, Z, X)` 约定文档化，可考虑统一为 `{pitch, yaw, roll}` 参数名 |

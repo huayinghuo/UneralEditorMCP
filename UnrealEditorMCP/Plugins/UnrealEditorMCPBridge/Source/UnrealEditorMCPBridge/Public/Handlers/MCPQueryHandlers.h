@@ -71,3 +71,18 @@ public:
 private:
 	FMCPBridgeServer* Server;
 };
+
+/**
+ * 桥接运行时状态诊断查询 —— 返回传输层实时状态
+ * 供 MCP 客户端在不查看 UE 日志的情况下判断服务是否就绪、是否被占用、最近故障原因
+ */
+class FMCPGetBridgeRuntimeStatusHandler : public IMCPBridgeHandler
+{
+public:
+	explicit FMCPGetBridgeRuntimeStatusHandler(FMCPBridgeServer* InServer) : Server(InServer) {}
+	virtual FString GetActionName() const override { return TEXT("get_bridge_runtime_status"); }
+	virtual EMCPActionCategory GetCategory() const override { return EMCPActionCategory::Read; }
+	virtual bool Execute(TSharedPtr<FJsonObject> Payload, TSharedPtr<FJsonObject>& OutResult, FString& OutErrorCode, FString& OutErrorMessage) override;
+private:
+	FMCPBridgeServer* Server;
+};

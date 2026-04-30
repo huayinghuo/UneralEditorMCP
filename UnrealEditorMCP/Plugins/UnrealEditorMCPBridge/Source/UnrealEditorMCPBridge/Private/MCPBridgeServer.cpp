@@ -39,7 +39,7 @@ FMCPBridgeServer::~FMCPBridgeServer()
 
 void FMCPBridgeServer::RegisterHandlers()
 {
-	// 查询类（7 个）
+	// 查询类（8 个 — 含诊断查询）
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPPingHandler()));
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPGetEditorInfoHandler()));
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPGetProjectInfoHandler()));
@@ -47,6 +47,7 @@ void FMCPBridgeServer::RegisterHandlers()
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPListAssetsHandler()));
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPGetAssetInfoHandler()));
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPGetMCPConfigHandler(this)));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPGetBridgeRuntimeStatusHandler(this)));
 	// Actor 类（4 个）
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPGetSelectedActorsHandler()));
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPListLevelActorsHandler()));
@@ -149,6 +150,8 @@ uint32 FMCPBridgeServer::Run()
 	if (!SocketSubsystem)
 	{
 		UE_LOG(LogMCPBridgeServer, Error, TEXT("Failed to get socket subsystem"));
+		ServerStatus = EMCPBridgeServerStatus::Error;
+		SetLastError(TEXT("SOCKET_SUBSYSTEM_FAILED"), TEXT("Failed to acquire platform socket subsystem"));
 		return 1;
 	}
 
@@ -156,6 +159,8 @@ uint32 FMCPBridgeServer::Run()
 	if (!ListenerSocket)
 	{
 		UE_LOG(LogMCPBridgeServer, Error, TEXT("Failed to create listener socket"));
+		ServerStatus = EMCPBridgeServerStatus::Error;
+		SetLastError(TEXT("CREATE_SOCKET_FAILED"), TEXT("Failed to create listener socket"));
 		return 1;
 	}
 
@@ -169,12 +174,15 @@ uint32 FMCPBridgeServer::Run()
 	{
 		UE_LOG(LogMCPBridgeServer, Error, TEXT("Failed to bind to %s:%d"), *BindAddr.ToString(), ServerPort);
 		ServerStatus = EMCPBridgeServerStatus::Error;
+		SetLastError(TEXT("BIND_FAILED"), FString::Printf(TEXT("Failed to bind to %s:%d"), *BindAddr.ToString(), ServerPort));
 		return 1;
 	}
 
 	if (!ListenerSocket->Listen(1))
 	{
 		UE_LOG(LogMCPBridgeServer, Error, TEXT("Failed to listen on port %d"), ServerPort);
+		ServerStatus = EMCPBridgeServerStatus::Error;
+		SetLastError(TEXT("LISTEN_FAILED"), FString::Printf(TEXT("Failed to listen on port %d"), ServerPort));
 		return 1;
 	}
 
@@ -192,20 +200,44 @@ uint32 FMCPBridgeServer::Run()
 		}
 
 		bool bHasPendingConnection = false;
-		if (!ActiveClient && ListenerSocket->HasPendingConnection(bHasPendingConnection) && bHasPendingConnection)
+		if (ListenerSocket->HasPendingConnection(bHasPendingConnection) && bHasPendingConnection)
 		{
 			TSharedRef<FInternetAddr> RemoteAddr = SocketSubsystem->CreateInternetAddr();
-			FScopeLock Lock(&ClientSocketCS);
-			ClientSocket = ListenerSocket->Accept(*RemoteAddr, TEXT("MCPBridgeClient"));
-			if (ClientSocket)
+			if (!ActiveClient)
 			{
-				UE_LOG(LogMCPBridgeServer, Log, TEXT("Client connected from %s"), *RemoteAddr->ToString(true));
-				ServerStatus = EMCPBridgeServerStatus::Connected;  // 客户端已连接
-				ReadBuffer.Empty();
+				// 无活跃客户端 → 正常接受连接
+				FScopeLock Lock(&ClientSocketCS);
+				ClientSocket = ListenerSocket->Accept(*RemoteAddr, TEXT("MCPBridgeClient"));
+				if (ClientSocket)
+				{
+					UE_LOG(LogMCPBridgeServer, Log, TEXT("Client connected from %s"), *RemoteAddr->ToString(true));
+					ServerStatus = EMCPBridgeServerStatus::Connected;  // 客户端已连接
+					ReadBuffer.Empty();
+				}
+				{
+					FScopeLock Lock2(&ClientSocketCS);
+					ActiveClient = ClientSocket;
+				}
 			}
+			else
 			{
-				FScopeLock Lock2(&ClientSocketCS);
-				ActiveClient = ClientSocket;
+				// 已有活跃客户端 → 拒绝第二连接（单客户端独占模型）
+				FSocket* RejectedSocket = ListenerSocket->Accept(*RemoteAddr, TEXT("MCPBridgeRejected"));
+				if (RejectedSocket)
+				{
+					UE_LOG(LogMCPBridgeServer, Warning,
+						TEXT("Rejected second client connection from %s (single-client model, '%s' already connected)"),
+						*RemoteAddr->ToString(true), *ActiveClient->GetDescription());
+					// 向被拒绝的客户端发送结构化错误后立即关闭
+					FMCPPendingResponse RejectResp;
+					RejectResp.Id = TEXT("");
+					RejectResp.bOk = false;
+					RejectResp.ErrorCode = TEXT("CLIENT_ALREADY_CONNECTED");
+					RejectResp.ErrorMessage = TEXT("Server is single-client: another client is already connected. Please disconnect first.");
+					SendResponse(RejectedSocket, RejectResp);
+					RejectedSocket->Close();
+					SocketSubsystem->DestroySocket(RejectedSocket);
+				}
 			}
 		}
 
@@ -327,6 +359,30 @@ bool FMCPBridgeServer::IsListening() const
 {
 	EMCPBridgeServerStatus Status = GetStatus();
 	return Status == EMCPBridgeServerStatus::Listening || Status == EMCPBridgeServerStatus::Connected;
+}
+
+bool FMCPBridgeServer::IsClientConnected() const
+{
+	return GetStatus() == EMCPBridgeServerStatus::Connected;
+}
+
+void FMCPBridgeServer::SetLastError(const FString& Code, const FString& Message)
+{
+	FScopeLock Lock(&LastErrorCS);
+	LastErrorCode = Code;
+	LastErrorMessage = Message;
+}
+
+FString FMCPBridgeServer::GetLastErrorCode()
+{
+	FScopeLock Lock(&LastErrorCS);
+	return LastErrorCode;
+}
+
+FString FMCPBridgeServer::GetLastErrorMessage()
+{
+	FScopeLock Lock(&LastErrorCS);
+	return LastErrorMessage;
 }
 
 void FMCPBridgeServer::ProcessPendingRequests()

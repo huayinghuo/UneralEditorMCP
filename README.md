@@ -204,7 +204,8 @@ Dangerous (1)：execute_python_snippet
 ## 当前限制
 
 - 仅本地回环（127.0.0.1），不支持远程访问
-- 单客户端 TCP 连接模式
+- 单客户端独占 TCP 连接模式（第二连接被拒绝并返回 CLIENT_ALREADY_CONNECTED 错误）
+- 运行时诊断：支持 `get_bridge_runtime_status` 查询服务状态（server_status / client_connected / last_error 等）
 - Blueprint 仅支持变量/函数添加，不支持节点级编辑
 - Widget 仅支持创建和查询，不支持树编辑
 - 不包含 Sequencer / Niagara / Animation 操作

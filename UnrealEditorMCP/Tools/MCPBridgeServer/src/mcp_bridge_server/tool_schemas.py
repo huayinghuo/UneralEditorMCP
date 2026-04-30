@@ -28,6 +28,13 @@ TOOL_SCHEMAS = {
             "type": "object", "properties": {}, "required": []
         },
     },
+    "get_bridge_runtime_status": {
+        "name": "ue_get_bridge_runtime_status",
+        "description": "Get bridge transport layer runtime status (server state, connection info, last error)",
+        "inputSchema": {
+            "type": "object", "properties": {}, "required": []
+        },
+    },
     "get_editor_info": {
         "name": "ue_get_editor_info",
         "description": "Get information about the running Unreal Editor instance",

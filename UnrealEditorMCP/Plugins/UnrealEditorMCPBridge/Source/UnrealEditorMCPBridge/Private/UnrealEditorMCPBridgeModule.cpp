@@ -43,7 +43,12 @@ void FUnrealEditorMCPBridgeModule::StartupModule()
 
 	if (!Server->IsListening())
 	{
-		UE_LOG(LogMCPBridge, Warning, TEXT("MCP Bridge server not ready (status=%d)"), static_cast<int32>(Server->GetStatus()));
+		UE_LOG(LogMCPBridge, Warning,
+			TEXT("MCP Bridge server not ready: status=%d, port=%d, last_error=[%s] %s"),
+			static_cast<int32>(Server->GetStatus()),
+			Server->GetServerPort(),
+			*Server->GetLastErrorCode(),
+			*Server->GetLastErrorMessage());
 	}
 
 	BeginFrameHandle = FCoreDelegates::OnBeginFrame.AddRaw(
