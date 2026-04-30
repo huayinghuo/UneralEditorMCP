@@ -4,6 +4,7 @@ UE MCP Bridge Server
 架构: MCP Client <--stdio--> UEMCPServer <--TCP--> UE Bridge Plugin
 
 Tool 列表来源：C++ action registry (get_mcp_config) ∩ Python schema 注册表 (tool_schemas.py)
+Resource 来源：Static (resources.py) + Live (get_mcp_config / get_bridge_runtime_status)
 """
 import json
 import asyncio
@@ -15,12 +16,13 @@ import mcp.types as types
 
 from .bridge_client import UEBridgeClient, UEBridgeError
 from .tool_schemas import TOOL_SCHEMAS, BOOTSTRAP_MCP_CONFIG
+from .resources import list_static_resources, get_static_resource
 
 logger = logging.getLogger(__name__)
 
 
 class UEMCPServer:
-    """MCP 协议服务器封装，动态生成 tool 列表"""
+    """MCP 协议服务器封装，动态生成 tool 列表和 resource 列表"""
 
     def __init__(self, token=None):
         self._server = Server("ue-mcp-bridge")
@@ -143,6 +145,121 @@ class UEMCPServer:
                         text=f"Internal error: {e}",
                     )
                 ]
+
+        # ── Resources Handlers ────────────────────────────────────────
+
+        @self._server.list_resources()
+        async def list_resources() -> list[types.Resource]:
+            """MCP 协议：resources/list —— Static + Live，离线退化"""
+            resources = list_static_resources()
+
+            # Live resources: always advertised, but degrade gracefully offline
+            resources.append(types.Resource(
+                uri="ue://runtime/config",
+                name="UE Runtime Config",
+                description="Live action registry snapshot from get_mcp_config (offline: bootstrap fallback)",
+                mimeType="application/json",
+            ))
+            resources.append(types.Resource(
+                uri="ue://runtime/status",
+                name="UE Runtime Status",
+                description="Live bridge status from get_bridge_runtime_status (offline: unavailable indicator)",
+                mimeType="application/json",
+            ))
+
+            logger.info("Listed %d resources (%d static, 2 live)", len(resources), len(resources) - 2)
+            return resources
+
+        @self._server.read_resource()
+        async def read_resource(uri: str) -> list[types.ReadResourceResult]:
+            """MCP 协议：resources/read —— 按 URI 分发到 static 或 live"""
+            # Static resources: delegated to resources.py
+            if uri.startswith("ue://resources/"):
+                result = get_static_resource(uri)
+                if result is not None:
+                    return [result]
+                raise ValueError(f"Unknown static resource: {uri}")
+
+            # Live resources: fetch from UE bridge
+            if uri == "ue://runtime/config":
+                return [await self._read_live_config()]
+            if uri == "ue://runtime/status":
+                return [await self._read_live_status()]
+
+            raise ValueError(f"Unknown resource URI: {uri}")
+
+    async def _read_live_config(self) -> types.ReadResourceResult:
+        """读取 ue://runtime/config，在线返回 live config，离线返回 bootstrap"""
+        try:
+            result = await asyncio.to_thread(self._bridge.send, "get_mcp_config")
+            if result.get("ok"):
+                data = result.get("result", {})
+                data["source"] = "ue-live"
+                data["connected"] = True
+                data["schema_registry_count"] = len(TOOL_SCHEMAS)
+                return types.ReadResourceResult(
+                    contents=[types.TextResourceContents(
+                        uri="ue://runtime/config",
+                        mimeType="application/json",
+                        text=json.dumps(data, indent=2, ensure_ascii=False),
+                    )]
+                )
+            # UE returned error → fallback to bootstrap
+            error = result.get("error", {})
+            logger.warning("runtime/config: UE returned error [%s], falling back to bootstrap",
+                           error.get("code", "UNKNOWN") if isinstance(error, dict) else "UNKNOWN")
+        except UEBridgeError as e:
+            logger.debug("runtime/config: UE offline (code=%s), returning bootstrap", e.code)
+        except Exception:
+            logger.debug("runtime/config: UE offline, returning bootstrap", exc_info=True)
+
+        # Bootstrap fallback
+        data = dict(BOOTSTRAP_MCP_CONFIG)
+        data["source"] = "python-bootstrap"
+        data["connected"] = False
+        return types.ReadResourceResult(
+            contents=[types.TextResourceContents(
+                uri="ue://runtime/config",
+                mimeType="application/json",
+                text=json.dumps(data, indent=2, ensure_ascii=False),
+            )]
+        )
+
+    async def _read_live_status(self) -> types.ReadResourceResult:
+        """读取 ue://runtime/status，在线返回 live status，离线返回 unavailable"""
+        try:
+            result = await asyncio.to_thread(self._bridge.send, "get_bridge_runtime_status")
+            if result.get("ok"):
+                data = result.get("result", {})
+                data["resource_source"] = "ue-live"
+                return types.ReadResourceResult(
+                    contents=[types.TextResourceContents(
+                        uri="ue://runtime/status",
+                        mimeType="application/json",
+                        text=json.dumps(data, indent=2, ensure_ascii=False),
+                    )]
+                )
+            error = result.get("error", {})
+            logger.warning("runtime/status: UE returned error [%s]",
+                           error.get("code", "UNKNOWN") if isinstance(error, dict) else "UNKNOWN")
+        except UEBridgeError as e:
+            logger.debug("runtime/status: UE offline (code=%s), returning unavailable", e.code)
+        except Exception:
+            logger.debug("runtime/status: UE offline, returning unavailable", exc_info=True)
+
+        # Offline: return unavailable indicator, not fake live data
+        return types.ReadResourceResult(
+            contents=[types.TextResourceContents(
+                uri="ue://runtime/status",
+                mimeType="application/json",
+                text=json.dumps({
+                    "server_status": "Unavailable",
+                    "connected": False,
+                    "resource_source": "python-offline",
+                    "note": "UE Editor is not running or bridge is not reachable",
+                }, indent=2, ensure_ascii=False),
+            )]
+        )
 
     async def run(self):
         async with stdio_server() as (reader, writer):
