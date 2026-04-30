@@ -6,6 +6,7 @@ All content derived from implemented capabilities, not ideal designs.
 """
 import json
 import mcp.types as types
+from mcp.server.lowlevel.helper_types import ReadResourceContents
 
 # ── Static Resource Definitions ──────────────────────────────────────────
 
@@ -307,19 +308,14 @@ spec1.to_node   == spec2.to_node    // round-trip compatible
 }
 
 
-def get_static_resource(uri: str) -> types.ReadResourceResult | None:
-    """Return a static resource by URI, or None if not found."""
+def get_static_resource(uri: str) -> ReadResourceContents | None:
+    """Return a static resource content by URI, or None if not found."""
     entry = RESOURCE_REGISTRY.get(uri)
     if entry is None:
         return None
-    return types.ReadResourceResult(
-        contents=[
-            types.TextResourceContents(
-                uri=uri,
-                mimeType=entry["mimeType"],
-                text=entry["content"],
-            )
-        ]
+    return ReadResourceContents(
+        content=entry["content"],
+        mime_type=entry["mimeType"],
     )
 
 
