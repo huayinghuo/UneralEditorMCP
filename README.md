@@ -91,7 +91,7 @@ Unreal Engine 5.3 Editor
 | `ue_widget_get_property_schema` | 查询控件可编辑属性清单（name/type/editable） |
 | `ue_widget_get_slot_schema` | 查询控件 slot 类及可编辑属性 |
 | `ue_widget_find` | 按 name/class 搜索 Widget 树节点 |
-| `ue_widget_set_root` | 设定/替换 root widget |
+| `ue_widget_set_root` | 设定/替换 root widget（替换时丢弃已有子树） |
 | `ue_widget_reparent` | 移动节点到新 parent（含循环检测） |
 | `ue_widget_reorder_child` | 调整 sibling 顺序 |
 | `ue_widget_rename` | 重命名节点（含冲突检测） |

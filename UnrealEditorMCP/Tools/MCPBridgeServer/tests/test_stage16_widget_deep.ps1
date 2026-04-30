@@ -185,17 +185,6 @@ $r = Send-Request "blueprint_compile_save" @{ asset_path = "$bpPath.$bpName"; sa
 Assert "8.2 compile save" $r.ok "error=$($r.error.code)"
 $log += ""
 
-# ===== Part 8: Final state ====="
-$log += "===== Part 8: Final State ====="
-Start-Sleep -Seconds 3
-$r = Send-Request "get_widget_info" @{ asset_path = "$bpPath.$bpName" }
-Assert "8.1 final get_widget_info" $r.ok "error=$($r.error.code)"
-
-Start-Sleep -Seconds 3
-$r = Send-Request "blueprint_compile_save" @{ asset_path = "$bpPath.$bpName"; save = $true }
-Assert "8.2 compile save" $r.ok "error=$($r.error.code)"
-$log += ""
-
 # ===== Summary =====
 $log += "===== SUMMARY ====="
 $log += "Passed: $passCount"
