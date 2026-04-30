@@ -121,16 +121,21 @@ $log += ""
 # ===== Part 5: Structure editing =====
 $log += "===== Part 5: Structure Editing ====="
 Start-Sleep -Seconds 3
-$r = Send-Request "widget_reparent" @{ asset_path = "$bpPath.$bpName"; widget_name = "HeroImage"; parent_widget = "RootVBox" }
-Assert "5.1 reparent HeroImage" $r.ok "error=$($r.error.code)"  # Already under RootVBox, should succeed
-
-Start-Sleep -Seconds 3
 $r = Send-Request "widget_rename" @{ asset_path = "$bpPath.$bpName"; widget_name = "ConfirmLabel"; new_name = "ConfirmText" }
-Assert "5.2 rename ConfirmLabel->ConfirmText" $r.ok "error=$($r.error.code)"
+Assert "5.1 rename ConfirmLabel->ConfirmText" $r.ok "error=$($r.error.code)"
 
 Start-Sleep -Seconds 3
 $r = Send-Request "widget_duplicate" @{ asset_path = "$bpPath.$bpName"; widget_name = "TitleText" }
-Assert "5.3 duplicate TitleText" $r.ok "error=$($r.error.code)"
+Assert "5.2 duplicate TitleText" $r.ok "error=$($r.error.code)"
+
+Start-Sleep -Seconds 3
+$r = Send-Request "widget_reorder_child" @{ asset_path = "$bpPath.$bpName"; widget_name = "HeroImage"; index = 0 }
+Assert "5.3 reorder HeroImage to index 0" $r.ok "error=$($r.error.code)"
+
+Start-Sleep -Seconds 3
+$r = Send-Request "widget_set_root" @{ asset_path = "$bpPath.$bpName"; widget_class = "SizeBox" }
+Assert "5.4 replace root with SizeBox" $r.ok "error=$($r.error.code)"
+if ($r.ok) { $log += "   replaced=$($r.result.replaced)" }
 $log += ""
 
 # ===== Part 6: Wrap =====
@@ -143,8 +148,8 @@ $log += ""
 # ===== Part 7: Error paths =====
 $log += "===== Part 7: Error Paths ====="
 Start-Sleep -Seconds 3
-$r = Send-Request "widget_set_root" @{ asset_path = "$bpPath.$bpName"; widget_class = "CanvasPanel" }
-Assert "7.1 ROOT_ALREADY_EXISTS" ((-not $r.ok) -and ($r.error.code -eq "ROOT_ALREADY_EXISTS")) "code=$($r.error.code)"
+$r = Send-Request "widget_set_root" @{ asset_path = "$bpPath.$bpName"; widget_class = "NotAWidgetClass" }
+Assert "7.1 CLASS_NOT_FOUND for bad root" ((-not $r.ok) -and ($r.error.code -eq "CLASS_NOT_FOUND")) "code=$($r.error.code)"
 
 Start-Sleep -Seconds 3
 $r = Send-Request "widget_reparent" @{ asset_path = "$bpPath.$bpName"; widget_name = "RootVBox"; parent_widget = "ConfirmButton" }

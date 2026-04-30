@@ -216,14 +216,21 @@ bool FMCPCreateWidgetBlueprintHandler::Execute(TSharedPtr<FJsonObject> Payload, 
 	{
 		UClass* RootClass = FindFirstObject<UClass>(*RootWidgetClass, EFindFirstObjectOptions::None, ELogVerbosity::NoLogging);
 		if (!RootClass) RootClass = FindFirstObject<UClass>(*(FString(TEXT("U") + RootWidgetClass)), EFindFirstObjectOptions::None, ELogVerbosity::NoLogging);
-		if (RootClass && RootClass->IsChildOf(UWidget::StaticClass()))
+		if (!RootClass || !RootClass->IsChildOf(UWidget::StaticClass()))
 		{
-			WidgetBP->Modify();
-			WidgetBP->WidgetTree->RootWidget = WidgetBP->WidgetTree->ConstructWidget<UWidget>(RootClass, FName(*RootWidgetClass));
-			FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WidgetBP);
-			OutResult->SetStringField(TEXT("root_widget"), WidgetBP->WidgetTree->RootWidget->GetName());
-			OutResult->SetStringField(TEXT("root_widget_class"), RootWidgetClass);
+			MCPBridgeHelpers::BuildErrorResponse(TEXT("CLASS_NOT_FOUND"), FString::Printf(TEXT("Root widget class '%s' not found or not a widget"), *RootWidgetClass), OutErrorCode, OutErrorMessage);
+			return false;
 		}
+
+		WidgetBP->Modify();
+		WidgetBP->WidgetTree->RootWidget = WidgetBP->WidgetTree->ConstructWidget<UWidget>(RootClass, FName(*RootWidgetClass));
+		FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WidgetBP);
+		OutResult->SetStringField(TEXT("root_widget"), WidgetBP->WidgetTree->RootWidget->GetName());
+		OutResult->SetStringField(TEXT("root_widget_class"), RootWidgetClass);
+
+		// Re-save after root creation so root is persisted across reload
+		bSaved = UPackage::SavePackage(Package, WidgetBP, *FilePath, SaveArgs);
+		OutResult->SetBoolField(TEXT("saved"), bSaved);
 	}
 
 	if (!bSaved)
@@ -333,15 +340,32 @@ bool FMCPWidgetRemoveChildHandler::Execute(TSharedPtr<FJsonObject> Payload, TSha
 	return true;
 }
 
-// ====== SetProperty（新增：设置 Widget 属性）======
+// ====== SetProperty（增强：typed value 支持）======
 bool FMCPWidgetSetPropertyHandler::Execute(TSharedPtr<FJsonObject> Payload, TSharedPtr<FJsonObject>& OutResult, FString& OutErrorCode, FString& OutErrorMessage)
 {
-	FString AssetPath, WidgetName, PropName, Value;
+	FString AssetPath, WidgetName, PropName;
 	if (!Payload.IsValid() || !Payload->TryGetStringField(TEXT("asset_path"), AssetPath) || !Payload->TryGetStringField(TEXT("widget_name"), WidgetName)
-		|| !Payload->TryGetStringField(TEXT("property_name"), PropName) || !Payload->TryGetStringField(TEXT("value"), Value))
+		|| !Payload->TryGetStringField(TEXT("property_name"), PropName))
 	{
-		MCPBridgeHelpers::BuildErrorResponse(TEXT("MISSING_PARAM"), TEXT("asset_path, widget_name, property_name, value required"), OutErrorCode, OutErrorMessage);
+		MCPBridgeHelpers::BuildErrorResponse(TEXT("MISSING_PARAM"), TEXT("asset_path, widget_name, property_name required"), OutErrorCode, OutErrorMessage);
 		return false;
+	}
+
+	// Typed value: prefer bool/number, fall back to string
+	FString Value;
+	if (!Payload->TryGetStringField(TEXT("value"), Value))
+	{
+		bool bBoolVal = false;
+		double dNumVal = 0.0;
+		if (Payload->TryGetBoolField(TEXT("value"), bBoolVal))
+			Value = bBoolVal ? TEXT("true") : TEXT("false");
+		else if (Payload->TryGetNumberField(TEXT("value"), dNumVal))
+			Value = FString::Printf(TEXT("%f"), dNumVal);
+		else
+		{
+			MCPBridgeHelpers::BuildErrorResponse(TEXT("MISSING_PARAM"), TEXT("payload.value is required"), OutErrorCode, OutErrorMessage);
+			return false;
+		}
 	}
 
 	UWidgetBlueprint* WidgetBP = LoadObject<UWidgetBlueprint>(nullptr, *AssetPath);
@@ -510,16 +534,43 @@ bool FMCPWidgetSetRootHandler::Execute(TSharedPtr<FJsonObject> Payload, TSharedP
 	if (!WidgetBP || !WidgetBP->WidgetTree)
 	{ MCPBridgeHelpers::BuildErrorResponse(TEXT("WIDGET_NOT_FOUND"), TEXT("Widget Blueprint not found"), OutErrorCode, OutErrorMessage); return false; }
 
-	if (WidgetBP->WidgetTree->RootWidget)
-	{ MCPBridgeHelpers::BuildErrorResponse(TEXT("ROOT_ALREADY_EXISTS"), TEXT("Root widget already exists; remove it first or use another widget blueprint"), OutErrorCode, OutErrorMessage); return false; }
-
 	UClass* WClass = FindFirstObject<UClass>(*WidgetClass, EFindFirstObjectOptions::None, ELogVerbosity::NoLogging);
 	if (!WClass) WClass = FindFirstObject<UClass>(*(FString(TEXT("U") + WidgetClass)), EFindFirstObjectOptions::None, ELogVerbosity::NoLogging);
 	if (!WClass || !WClass->IsChildOf(UWidget::StaticClass()))
 	{ MCPBridgeHelpers::BuildErrorResponse(TEXT("CLASS_NOT_FOUND"), FString::Printf(TEXT("Widget class '%s' not found"), *WidgetClass), OutErrorCode, OutErrorMessage); return false; }
 
 	WidgetBP->Modify();
-	WidgetBP->WidgetTree->RootWidget = WidgetBP->WidgetTree->ConstructWidget<UWidget>(WClass, FName(*WidgetClass));
+	bool bReplaced = false;
+
+	if (WidgetBP->WidgetTree->RootWidget)
+	{
+		// Replace: migrate existing root's children to new root, then replace
+		UWidget* OldRoot = WidgetBP->WidgetTree->RootWidget;
+		UWidget* NewRoot = WidgetBP->WidgetTree->ConstructWidget<UWidget>(WClass, FName(*WidgetClass));
+		if (!NewRoot)
+		{ MCPBridgeHelpers::BuildErrorResponse(TEXT("CREATE_FAILED"), TEXT("Failed to construct new root widget"), OutErrorCode, OutErrorMessage); return false; }
+
+		// If old root is a panel, move its children to new root
+		if (UPanelWidget* OldPanel = Cast<UPanelWidget>(OldRoot))
+		{
+			TArray<UWidget*> ChildrenCopy;
+			for (int32 i = 0; i < OldPanel->GetChildrenCount(); ++i)
+				ChildrenCopy.Add(OldPanel->GetChildAt(i));
+
+			for (UWidget* Child : ChildrenCopy)
+			{
+				if (UPanelWidget* NewPanel = Cast<UPanelWidget>(NewRoot))
+					NewPanel->AddChild(Child);
+			}
+		}
+		WidgetBP->WidgetTree->RootWidget = NewRoot;
+		bReplaced = true;
+	}
+	else
+	{
+		WidgetBP->WidgetTree->RootWidget = WidgetBP->WidgetTree->ConstructWidget<UWidget>(WClass, FName(*WidgetClass));
+	}
+
 	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WidgetBP);
 
 	OutResult = MakeShareable(new FJsonObject());
@@ -527,6 +578,7 @@ bool FMCPWidgetSetRootHandler::Execute(TSharedPtr<FJsonObject> Payload, TSharedP
 	OutResult->SetStringField(TEXT("root_widget"), WidgetBP->WidgetTree->RootWidget->GetName());
 	OutResult->SetStringField(TEXT("root_widget_class"), WidgetClass);
 	OutResult->SetBoolField(TEXT("set"), true);
+	OutResult->SetBoolField(TEXT("replaced"), bReplaced);
 	return true;
 }
 

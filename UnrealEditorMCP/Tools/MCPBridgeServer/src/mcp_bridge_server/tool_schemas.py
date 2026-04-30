@@ -570,14 +570,14 @@ TOOL_SCHEMAS = {
     },
     "widget_set_property": {
         "name": "ue_widget_set_property",
-        "description": "Set a property value on a widget in a Widget Blueprint",
+        "description": "Set a property value on a widget (supports string, number, and boolean values)",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "asset_path": {"type": "string"},
                 "widget_name": {"type": "string"},
                 "property_name": {"type": "string"},
-                "value": {"type": "string"},
+                "value": {"description": "Property value (string, number, or boolean)"},
             },
             "required": ["asset_path", "widget_name", "property_name", "value"],
         },
