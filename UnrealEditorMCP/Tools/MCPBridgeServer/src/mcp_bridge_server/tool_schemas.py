@@ -527,6 +527,7 @@ TOOL_SCHEMAS = {
             "properties": {
                 "name": {"type": "string"},
                 "path": {"type": "string"},
+                "root_widget_class": {"type": "string", "description": "Optional root widget class, e.g. CanvasPanel"},
             },
             "required": ["name"],
         },
@@ -550,6 +551,7 @@ TOOL_SCHEMAS = {
                 "widget_class": {"type": "string", "description": "Widget class name (e.g. TextBlock, Button, Image)"},
                 "parent_widget": {"type": "string", "description": "Optional parent panel name"},
                 "widget_name": {"type": "string", "description": "Optional name for the new widget"},
+                "index": {"type": "integer", "description": "Optional zero-based insertion index"},
             },
             "required": ["asset_path", "widget_class"],
         },

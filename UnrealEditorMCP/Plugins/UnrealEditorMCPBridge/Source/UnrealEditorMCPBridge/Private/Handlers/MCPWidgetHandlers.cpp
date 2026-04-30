@@ -210,6 +210,22 @@ bool FMCPCreateWidgetBlueprintHandler::Execute(TSharedPtr<FJsonObject> Payload, 
 	OutResult->SetBoolField(TEXT("created"), true);
 	OutResult->SetBoolField(TEXT("saved"), bSaved);
 
+	// 可选 root widget 设定
+	FString RootWidgetClass;
+	if (Payload->TryGetStringField(TEXT("root_widget_class"), RootWidgetClass) && !RootWidgetClass.IsEmpty())
+	{
+		UClass* RootClass = FindFirstObject<UClass>(*RootWidgetClass, EFindFirstObjectOptions::None, ELogVerbosity::NoLogging);
+		if (!RootClass) RootClass = FindFirstObject<UClass>(*(FString(TEXT("U") + RootWidgetClass)), EFindFirstObjectOptions::None, ELogVerbosity::NoLogging);
+		if (RootClass && RootClass->IsChildOf(UWidget::StaticClass()))
+		{
+			WidgetBP->Modify();
+			WidgetBP->WidgetTree->RootWidget = WidgetBP->WidgetTree->ConstructWidget<UWidget>(RootClass, FName(*RootWidgetClass));
+			FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WidgetBP);
+			OutResult->SetStringField(TEXT("root_widget"), WidgetBP->WidgetTree->RootWidget->GetName());
+			OutResult->SetStringField(TEXT("root_widget_class"), RootWidgetClass);
+		}
+	}
+
 	if (!bSaved)
 	{
 		MCPBridgeHelpers::BuildErrorResponse(TEXT("SAVE_FAILED"), TEXT("Widget Blueprint created but failed to save to disk"), OutErrorCode, OutErrorMessage);
@@ -266,7 +282,17 @@ bool FMCPWidgetAddChildHandler::Execute(TSharedPtr<FJsonObject> Payload, TShared
 	if (!NewWidget)
 	{ MCPBridgeHelpers::BuildErrorResponse(TEXT("CREATE_FAILED"), TEXT("Failed to construct widget"), OutErrorCode, OutErrorMessage); return false; }
 
-	ParentPanel->AddChild(NewWidget);
+	// Support optional index for insertion position
+	int32 InsertIndex = -1;
+	Payload->TryGetNumberField(TEXT("index"), InsertIndex);
+	if (InsertIndex >= 0)
+	{
+		ParentPanel->InsertChildAt(InsertIndex, NewWidget);
+	}
+	else
+	{
+		ParentPanel->AddChild(NewWidget);
+	}
 	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WidgetBP);
 
 	OutResult = MakeShareable(new FJsonObject());
