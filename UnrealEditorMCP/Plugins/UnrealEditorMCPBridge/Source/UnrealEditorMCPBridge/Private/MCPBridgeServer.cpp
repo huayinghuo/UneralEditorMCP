@@ -15,6 +15,7 @@
 #include "Handlers/MCPBlueprintUtilityHandlers.h"
 #include "Handlers/MCPPIERuntimeHandlers.h"
 #include "Handlers/MCPEnhancedInputHandlers.h"
+#include "Handlers/MCPGameplayTagHandlers.h"
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonWriter.h"
@@ -100,6 +101,15 @@ void FMCPBridgeServer::RegisterHandlers()
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPBlueprintSearchFunctionsHandler()));
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPBlueprintSetVariableDefaultHandler()));
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPBlueprintSetComponentDefaultHandler()));
+	// Blueprint CDO Property（4 个 — 阶段 19A）
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPBlueprintGetCDOPropertyHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPBlueprintSetCDOPropertyHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPBlueprintAddCDOArrayHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPBlueprintRemoveCDOArrayHandler()));
+	// GameplayTag（3 个 — 阶段 19B）
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPCreateGameplayTagHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPListGameplayTagsHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPSearchGameplayTagsHandler()));
 	// PIE Runtime（5 个）
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPPIEStartHandler()));
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPPIEStopHandler()));
@@ -238,6 +248,8 @@ uint32 FMCPBridgeServer::Run()
 	ServerStatus = EMCPBridgeServerStatus::Listening;  // Bind+Listen 成功，服务就绪
 
 	FString ReadBuffer;
+	int32 PendingRequestCount = 0;
+	double LastRequestTime = 0.0;
 
 	while (!bStopping)
 	{
@@ -353,7 +365,23 @@ uint32 FMCPBridgeServer::Run()
 
 					if (Action.IsEmpty())
 					{
-						FMCPPendingResponse Resp;
+		// 请求超时检测：Game Thread 被弹窗阻塞时，Server 线程主动返回警告
+			if (PendingRequestCount > 0 && ActiveClient && (FPlatformTime::Seconds() - LastRequestTime) > 5.0)
+			{
+				UE_LOG(LogMCPBridgeServer, Warning, TEXT("Request timeout (>5s) — Game Thread may be blocked by modal dialog"));
+				FMCPPendingResponse TimeoutResp;
+				TimeoutResp.Id = TEXT("");
+				TimeoutResp.bOk = false;
+				TimeoutResp.ErrorCode = TEXT("TIMEOUT");
+				TimeoutResp.ErrorMessage = TEXT("Request timed out (>5s). UE Editor may be blocked by a modal dialog. Close the dialog and retry.");
+				SendResponse(ActiveClient, TimeoutResp);
+				// 清空队列防止积压
+				FMCPPendingRequest DummyReq;
+				while (RequestQueue.Dequeue(DummyReq)) {}
+				PendingRequestCount = 0;
+			}
+
+			FMCPPendingResponse Resp;
 						Resp.Id = Id;
 						Resp.bOk = false;
 						Resp.ErrorCode = TEXT("MISSING_ACTION");
@@ -367,6 +395,8 @@ uint32 FMCPBridgeServer::Run()
 						Request.Action = Action;
 						Request.Payload = Payload;
 						RequestQueue.Enqueue(Request);
+						PendingRequestCount++;
+						LastRequestTime = FPlatformTime::Seconds();
 					}
 				}
 				else
@@ -385,6 +415,7 @@ uint32 FMCPBridgeServer::Run()
 			while (ResponseQueue.Dequeue(Resp))
 			{
 				SendResponse(ActiveClient, Resp);
+				PendingRequestCount = FMath::Max(0, PendingRequestCount - 1);
 			}
 		}
 

@@ -1,4 +1,4 @@
-"""MCP Tool Schema 注册表 —— 87 个 tool 的 action→（名称/描述/参数schema）映射
+"""MCP Tool Schema 注册表 —— 94 个 tool 的 action→（名称/描述/参数schema）映射
 
 C++ Handler 通过 get_mcp_config 暴露 action 列表，Python 端从此注册表取 schema，
 两者取交集生成最终 tool 列表，避免手工双写漂移。
@@ -686,6 +686,42 @@ TOOL_SCHEMAS = {
         "name": "ue_blueprint_add_imc_node",
         "description": "Add a node to add or remove an InputMappingContext in a Blueprint graph",
         "inputSchema": {"type":"object","properties":{"asset_path":{"type":"string"},"context_path":{"type":"string"}},"required":["asset_path","context_path"]},
+    },
+    # ---- CDO Property + GameplayTag (Stage 19) ----
+    "blueprint_get_cdo_property": {
+        "name": "ue_blueprint_get_cdo_property",
+        "description": "Read any property from a Blueprint's Class Default Object (CDO) via reflection",
+        "inputSchema": {"type":"object","properties":{"asset_path":{"type":"string"},"property_name":{"type":"string"}},"required":["asset_path","property_name"]},
+    },
+    "blueprint_set_cdo_property": {
+        "name": "ue_blueprint_set_cdo_property",
+        "description": "Set any property value on a Blueprint's CDO (ImportText → read-back)",
+        "inputSchema": {"type":"object","properties":{"asset_path":{"type":"string"},"property_name":{"type":"string"},"value":{"type":"string"}},"required":["asset_path","property_name"]},
+    },
+    "blueprint_add_cdo_array": {
+        "name": "ue_blueprint_add_cdo_array",
+        "description": "Add an element to a TArray property on a Blueprint's CDO",
+        "inputSchema": {"type":"object","properties":{"asset_path":{"type":"string"},"property_name":{"type":"string"},"value":{"type":"string","description":"Optional: struct value for the new element"}},"required":["asset_path","property_name"]},
+    },
+    "blueprint_remove_cdo_array": {
+        "name": "ue_blueprint_remove_cdo_array",
+        "description": "Remove an element from a TArray property on a Blueprint's CDO by index",
+        "inputSchema": {"type":"object","properties":{"asset_path":{"type":"string"},"property_name":{"type":"string"},"index":{"type":"number"}},"required":["asset_path","property_name","index"]},
+    },
+    "create_gameplay_tag": {
+        "name": "ue_create_gameplay_tag",
+        "description": "Create or find a GameplayTag (valid for GAS AbilitySystem usage)",
+        "inputSchema": {"type":"object","properties":{"tag_name":{"type":"string"},"description":{"type":"string"}},"required":["tag_name"]},
+    },
+    "list_gameplay_tags": {
+        "name": "ue_list_gameplay_tags",
+        "description": "List all registered GameplayTags in the project (capped at 200 by default)",
+        "inputSchema": {"type":"object","properties":{"max_results":{"type":"number"}},"required":[]},
+    },
+    "search_gameplay_tags": {
+        "name": "ue_search_gameplay_tags",
+        "description": "Search GameplayTags by name substring",
+        "inputSchema": {"type":"object","properties":{"search_term":{"type":"string"},"max_results":{"type":"number"}},"required":[]},
     },
     # ---- Material ----
     "list_materials": {

@@ -32,7 +32,8 @@ public class UnrealEditorMCPBridge : ModuleRules
 			"UMGEditor",
 			"MaterialEditor",
 			"EnhancedInput",
-			"InputCore"
+			"InputCore",
+			"GameplayTags"
 		});
 	}
 }

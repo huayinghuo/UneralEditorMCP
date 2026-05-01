@@ -72,11 +72,21 @@ bool FMCPSearchInputActionsHandler::Execute(TSharedPtr<FJsonObject> Payload, TSh
 bool FMCPCreateInputActionHandler::Execute(TSharedPtr<FJsonObject> Payload, TSharedPtr<FJsonObject>& OutResult, FString& OutErrorCode, FString& OutErrorMessage)
 {
 	FString N,P=TEXT("/Game/MCPTest");if(!Payload.IsValid()||!Payload->TryGetStringField(TEXT("name"),N)){MCPBridgeHelpers::BuildErrorResponse(TEXT("MISSING_PARAM"),TEXT("name required"),OutErrorCode,OutErrorMessage);return false;}if(Payload.IsValid())Payload->TryGetStringField(TEXT("path"),P);
+	FString PackageName = P / N;
+	static TSet<FString> Created;
+	if (Created.Contains(PackageName)) { MCPBridgeHelpers::BuildErrorResponse(TEXT("ASSET_CONFLICT"), FString::Printf(TEXT("'%s' already exists (in-session duplicate)"), *N), OutErrorCode, OutErrorMessage); return false; }
+	// 四重检查：内存 + UE 包系统 + 纯文件系统（防 CreatePackage 内核层弹窗）
+	FString UEFilePath = FPackageName::LongPackageNameToFilename(PackageName, FPackageName::GetAssetPackageExtension());
+	if (FindPackage(nullptr, *PackageName) || LoadPackage(nullptr, *PackageName, LOAD_NoWarn|LOAD_Quiet)
+		|| FPaths::FileExists(UEFilePath) || IFileManager::Get().FileExists(*UEFilePath))
+	{ MCPBridgeHelpers::BuildErrorResponse(TEXT("ASSET_CONFLICT"), FString::Printf(TEXT("'%s' already exists"), *N), OutErrorCode, OutErrorMessage); return false; }
+	UPackage* Pkg = CreatePackage(*PackageName); if(!Pkg){MCPBridgeHelpers::BuildErrorResponse(TEXT("CREATE_FAILED"),TEXT("CreatePackage failed"),OutErrorCode,OutErrorMessage);return false;}
+	Created.Add(PackageName);
 	FString VT=TEXT("bool");if(Payload.IsValid())Payload->TryGetStringField(TEXT("value_type"),VT);
-	FAssetToolsModule& ATM=FModuleManager::LoadModuleChecked<FAssetToolsModule>(TEXT("AssetTools"));
-	UObject* O=ATM.Get().CreateAsset(N,P,UInputAction::StaticClass(),nullptr);if(!O){MCPBridgeHelpers::BuildErrorResponse(TEXT("CREATE_FAILED"),TEXT("Failed"),OutErrorCode,OutErrorMessage);return false;}
-	UInputAction* IA=Cast<UInputAction>(O);if(VT==TEXT("float"))IA->ValueType=EInputActionValueType::Axis1D;else if(VT==TEXT("vector2d"))IA->ValueType=EInputActionValueType::Axis2D;else if(VT==TEXT("vector3d"))IA->ValueType=EInputActionValueType::Axis3D;
-	IA->MarkPackageDirty();OutResult=MakeShareable(new FJsonObject());BuildIAJson(IA,OutResult);return true;
+	UInputAction* IA = NewObject<UInputAction>(Pkg, *N, RF_Public|RF_Standalone); if(!IA){MCPBridgeHelpers::BuildErrorResponse(TEXT("CREATE_FAILED"),TEXT("NewObject failed"),OutErrorCode,OutErrorMessage);return false;}
+	FAssetRegistryModule::AssetCreated(IA); Pkg->MarkPackageDirty();
+	if(VT==TEXT("float"))IA->ValueType=EInputActionValueType::Axis1D;else if(VT==TEXT("vector2d"))IA->ValueType=EInputActionValueType::Axis2D;else if(VT==TEXT("vector3d"))IA->ValueType=EInputActionValueType::Axis3D;
+	OutResult=MakeShareable(new FJsonObject());BuildIAJson(IA,OutResult);return true;
 }
 bool FMCPGetInputActionInfoHandler::Execute(TSharedPtr<FJsonObject> Payload, TSharedPtr<FJsonObject>& OutResult, FString& OutErrorCode, FString& OutErrorMessage)
 { FString P;if(!Payload.IsValid()||!Payload->TryGetStringField(TEXT("asset_path"),P)){MCPBridgeHelpers::BuildErrorResponse(TEXT("MISSING_PARAM"),TEXT("asset_path required"),OutErrorCode,OutErrorMessage);return false;}UInputAction* IA=LoadIA(P);if(!IA){MCPBridgeHelpers::BuildErrorResponse(TEXT("ASSET_NOT_FOUND"),TEXT("Not found"),OutErrorCode,OutErrorMessage);return false;}OutResult=MakeShareable(new FJsonObject());BuildIAJson(IA,OutResult);return true; }
@@ -95,9 +105,17 @@ bool FMCPSearchIMCHandler::Execute(TSharedPtr<FJsonObject> Payload, TSharedPtr<F
 bool FMCPCreateIMCHandler::Execute(TSharedPtr<FJsonObject> Payload, TSharedPtr<FJsonObject>& OutResult, FString& OutErrorCode, FString& OutErrorMessage)
 {
 	FString N,P=TEXT("/Game/MCPTest");if(!Payload.IsValid()||!Payload->TryGetStringField(TEXT("name"),N)){MCPBridgeHelpers::BuildErrorResponse(TEXT("MISSING_PARAM"),TEXT("name required"),OutErrorCode,OutErrorMessage);return false;}if(Payload.IsValid())Payload->TryGetStringField(TEXT("path"),P);
-	FAssetToolsModule& ATM=FModuleManager::LoadModuleChecked<FAssetToolsModule>(TEXT("AssetTools"));
-	UObject* O=ATM.Get().CreateAsset(N,P,UInputMappingContext::StaticClass(),nullptr);if(!O){MCPBridgeHelpers::BuildErrorResponse(TEXT("CREATE_FAILED"),TEXT("Failed"),OutErrorCode,OutErrorMessage);return false;}
-	OutResult=MakeShareable(new FJsonObject());BuildIMCJson(Cast<UInputMappingContext>(O),OutResult);return true;
+	FString PackageName = P / N;
+	static TSet<FString> Created;
+	if (Created.Contains(PackageName)) { MCPBridgeHelpers::BuildErrorResponse(TEXT("ASSET_CONFLICT"), FString::Printf(TEXT("'%s' already exists (in-session)"), *N), OutErrorCode, OutErrorMessage); return false; }
+	FString UEFP = FPackageName::LongPackageNameToFilename(PackageName, FPackageName::GetAssetPackageExtension());
+	if (FindPackage(nullptr, *PackageName) || FPaths::FileExists(UEFP) || IFileManager::Get().FileExists(*UEFP))
+	{ MCPBridgeHelpers::BuildErrorResponse(TEXT("ASSET_CONFLICT"), FString::Printf(TEXT("'%s' already exists"), *N), OutErrorCode, OutErrorMessage); return false; }
+	UPackage* Pkg = CreatePackage(*PackageName); if(!Pkg){MCPBridgeHelpers::BuildErrorResponse(TEXT("CREATE_FAILED"),TEXT("CreatePackage failed"),OutErrorCode,OutErrorMessage);return false;}
+	Created.Add(PackageName);
+	UInputMappingContext* IMC = NewObject<UInputMappingContext>(Pkg, *N, RF_Public|RF_Standalone); if(!IMC){MCPBridgeHelpers::BuildErrorResponse(TEXT("CREATE_FAILED"),TEXT("NewObject failed"),OutErrorCode,OutErrorMessage);return false;}
+	FAssetRegistryModule::AssetCreated(IMC); Pkg->MarkPackageDirty();
+	OutResult=MakeShareable(new FJsonObject());BuildIMCJson(IMC,OutResult);return true;
 }
 bool FMCPGetIMCInfoHandler::Execute(TSharedPtr<FJsonObject> Payload, TSharedPtr<FJsonObject>& OutResult, FString& OutErrorCode, FString& OutErrorMessage)
 { FString P;if(!Payload.IsValid()||!Payload->TryGetStringField(TEXT("asset_path"),P)){MCPBridgeHelpers::BuildErrorResponse(TEXT("MISSING_PARAM"),TEXT("asset_path required"),OutErrorCode,OutErrorMessage);return false;}UInputMappingContext* I=LoadIMC(P);if(!I){MCPBridgeHelpers::BuildErrorResponse(TEXT("ASSET_NOT_FOUND"),TEXT("Not found"),OutErrorCode,OutErrorMessage);return false;}OutResult=MakeShareable(new FJsonObject());BuildIMCJson(I,OutResult);return true; }

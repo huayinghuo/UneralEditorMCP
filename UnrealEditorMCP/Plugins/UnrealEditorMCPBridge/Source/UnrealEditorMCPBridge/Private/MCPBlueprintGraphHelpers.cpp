@@ -32,13 +32,24 @@ namespace MCPBlueprintGraphHelpers
 		UClass* ParentClass = FindFirstObject<UClass>(*ParentClassName, EFindFirstObjectOptions::None, ELogVerbosity::NoLogging);
 		if (!ParentClass)
 		{
-			FString WithPrefix = TEXT("A") + ParentClassName;
-			ParentClass = FindFirstObject<UClass>(*WithPrefix, EFindFirstObjectOptions::None, ELogVerbosity::NoLogging);
+			// 尝试常见前缀：A->Actor, U->Object, BP -> Blueprint 派生类
+			for (const TCHAR* Prefix : { TEXT("A"), TEXT("U"), TEXT("") })
+			{
+				FString Prefixed = FString(Prefix) + ParentClassName;
+				ParentClass = FindFirstObject<UClass>(*Prefixed, EFindFirstObjectOptions::None, ELogVerbosity::NoLogging);
+				if (ParentClass) break;
+			}
 		}
-		if (!ParentClass || !ParentClass->IsChildOf(AActor::StaticClass()))
+		if (!ParentClass || !ParentClass->IsChildOf(UObject::StaticClass()))
 		{
 			OutErrorCode = TEXT("CLASS_NOT_FOUND");
-			OutErrorMessage = FString::Printf(TEXT("Parent class '%s' not found or not an Actor subclass"), *ParentClassName);
+			OutErrorMessage = FString::Printf(TEXT("Parent class '%s' not found"), *ParentClassName);
+			return false;
+		}
+		if (ParentClass->HasMetaData(TEXT("NotBlueprintable")))
+		{
+			OutErrorCode = TEXT("CLASS_NOT_FOUND");
+			OutErrorMessage = FString::Printf(TEXT("Parent class '%s' is marked NotBlueprintable"), *ParentClassName);
 			return false;
 		}
 		return true;

@@ -258,6 +258,7 @@ Port=9876
 | 端口被占用 | 关闭旧 Editor 进程或等待 2 分钟 TIME_WAIT 释放 |
 | UE Editor 未连接 | 确认插件编译并加载，检查日志 `MCP Bridge listening` |
 | Python 执行失败 `PYTHON_UNAVAILABLE` | 确认 `.uproject` 已启用 `PythonScriptPlugin` |
+| 请求超时返回 `TIMEOUT` (>5s) | UE Editor 可能被模态弹窗阻塞（如资产重名提示）。关闭弹窗后重试 |
 | 创建资产 `ASSET_CONFLICT` | 目标路径已有同名资产 |
 | 双重 `begin_transaction` | 先调用 `end_transaction` 再重新开始 |
 | 断连后事务悬挂 | 插件自动结束活跃事务并丢弃残留请求 |

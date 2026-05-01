@@ -1,26 +1,45 @@
 # Last Operation
 
-Session: 2026-05-01 20:36
-Phase: GAS 文档分工修正
-Status: ✅ `GASPlan/gas-game-plan.md` 写游戏项目计划，`.kilo/gas/gas-game-plan.md` 写 MCP 需求项
+Session: 2026-05-02 01:32
+Phase: 阶段 19 + 20A 交付完成
+Status: ✅ 94 Handler，编译通过，超时警告机制已添加
 
-## 本次交付
+## 19A — 父类放宽 + CDO 通用属性（2 Handler）
 
-| 文件 | 内容 |
+| Action | 类别 | 说明 |
+|--------|------|------|
+| `blueprint_get_cdo_property` | Read | 读取 BP CDO 任意属性（FindPropertyByName + ExportText） |
+| `blueprint_set_cdo_property` | Write | 设置 BP CDO 任意属性（ImportText → read-back） |
+| 父类检查放宽 | — | `IsChildOf(AActor)` → `IsChildOf(UObject)` + `NotBlueprintable` 排除 |
+
+## 19B — GameplayTag 管理（3 Handler）
+
+| Action | 类别 | 说明 |
+|--------|------|------|
+| `create_gameplay_tag` | Write | AddNativeGameplayTag + GConfig->SetArray 持久化到 DefaultGameplayTags.ini |
+| `list_gameplay_tags` | Read | 按 GAS 常用前缀批量查询 |
+| `search_gameplay_tags` | Read | 按模式和通配符匹配 |
+
+## 19C — Python 输出捕获
+
+| 修复 | 文件 |
 |------|------|
-| `GASPlan/gas-game-plan.md` | GAS 学习、项目本体开发、多人同步验证的游戏项目计划 |
-| `.kilo/gas/gas-game-plan.md` | GAS 阶段推进过程中沉淀的 MCP 能力需求项 |
-| `.ai/plan/plan_log.md` | 追加 GAS 计划创建记录 |
-| `.ai/log/log.md` | 追加操作日志索引 |
-| `.ai/log/2026/05/01/2026-05-01-003.md` | 记录本次计划创建细节 |
+| `ExecPythonCommand` → `ExecPythonCommandEx` + `CommandResult` + `LogOutput` | `MCPPythonHandler.cpp` |
 
-## 关键结论
+## 20A — EI 资产创建防弹窗
 
-- 游戏方向：地牢战斗肉鸽，参考灰烬之国类战斗体验，优先实现完整战斗系统。
-- 实现边界：GAS 游戏代码进入 `UnrealEditorMCP/Source/UnrealEditorMCP/`，不放入 MCP 插件。
-- 文档边界：`GASPlan/gas-game-plan.md` 写游戏项目计划；`.kilo/gas/gas-game-plan.md` 只写 MCP 需求项。
-- MCP 复盘：每个 GAS 阶段结束后，将自动化能力缺口追加到 `.kilo/gas/gas-game-plan.md`。
+| 修复 | 文件 |
+|------|------|
+| 三重检查（static TSet + FindPackage + LoadPackage） | `MCPEnhancedInputHandlers.cpp` |
+| `AssetTools::CreateAsset` → `CreatePackage+NewObject` 直接创建 | `MCPEnhancedInputHandlers.cpp` |
 
-## Next
+## 超时警告机制（无法根除 UE 内核弹窗）
 
-执行阶段 A：启用 GAS/Enhanced Input 依赖，创建 ASC PlayerState、CharacterBase、PlayerCharacter、EnemyCharacter、PlayerController、GameMode 基线并编译验证。
+| 修复 | 文件 |
+|------|------|
+| Server 线程 5s 超时 → `TIMEOUT` 错误 + 清空队列 | `MCPBridgeServer.cpp:395-408` |
+| Python server.py `TIMEOUT` → 中文警告 | `server.py:104-107` |
+| README FAQ 超时说明 | `README.md:264` |
+
+## Handler 累计
+87（阶段 18） → 94（+4 CDO, +3 GameplayTag）

@@ -99,12 +99,14 @@ class UEMCPServer:
                             text=json.dumps(response_data, indent=2, ensure_ascii=False),
                         )
                     ]
-                else:
-                    error = result.get("error", {})
-                    code = error.get("code", "UNKNOWN") if isinstance(error, dict) else "UNKNOWN"
-                    msg = error.get("message", str(error)) if isinstance(error, dict) else str(error)
-                    logger.warning("UE action '%s' returned error [%s]: %s", action, code, msg)
-                    return [
+			else:
+					error = result.get("error", {})
+					code = error.get("code", "UNKNOWN") if isinstance(error, dict) else "UNKNOWN"
+					msg = error.get("message", str(error)) if isinstance(error, dict) else str(error)
+					logger.warning("UE action '%s' returned error [%s]: %s", action, code, msg)
+					if code == "TIMEOUT":
+						msg = "TIMEOUT: UE Editor 可能被模态对话框阻塞（如资产重名提示）。请关闭对话框后重试。\nDetails: " + msg
+					return [
                         types.TextContent(
                             type="text",
                             text=f"Error [{code}]: {msg}",

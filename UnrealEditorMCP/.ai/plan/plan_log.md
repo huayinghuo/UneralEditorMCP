@@ -34,5 +34,8 @@
 [2026-05-01] 阶段 17 验收修复：apply_spec dispatch 补齐 3 节点类型 + README 同步 + test_stage17.ps1 创建（9/9 测试通过）
 [2026-05-01] 阶段 18A：函数搜索+CDO默认值（3 Handler, 65→68, 编译通过）
 [2026-05-01] 阶段 18B：PIE 运行时控制（5 Handler, 68→73, 编译通过）
-[2026-05-01] 阶段 18C：Enhanced Input 完整模块（14 Handler, 73→87, 编译通过）
+[2026-05-02] 阶段 19：父类放宽 + CDO 通用属性 + GameplayTag + Python 输出（87→94 Handler，编译通过）
+[2026-05-02] 20A：EI 资产创建防弹窗（三重检查 + static TSet）+ 超时警告机制（Server 线程 5s→TIMEOUT）
 [2026-05-01] GAS 文档分工：`GASPlan/gas-game-plan.md` 写游戏项目计划，`.kilo/gas/gas-game-plan.md` 写 MCP 需求项
+[2026-05-01] 阶段 A 完成：GAS 项目基线（.uproject 插件 + Build.cs 模块 + 6 类 12 文件 + 编译通过，20 actions 0 errors）
+[2026-05-01] 阶段 B MCP 能力边界实测：GE 蓝图创建 + DurationPolicy ✓，Modifier/Tag/SetByCaller ✗→ 5 条 MCP 需求追加

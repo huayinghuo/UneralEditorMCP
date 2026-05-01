@@ -30,22 +30,23 @@
 | **17** | **Blueprint 图编辑对齐参考项目**（58→65 Handler，7 新命令） | ✅ |
 | **18** | **函数搜索 + PIE 运行时 + Enhanced Input 完整栈**（65→87 Handler，18A+18B+18C 全部验收通过） | ✅ |
 
-## Handler 清单（87 个）
+## Handler 清单（94 个）
 
 ```
-Read (32): ping / get_bridge_runtime_status / editor_info / project_info / world_state
+Read (33): ping / get_bridge_runtime_status / editor_info / project_info / world_state
            list_assets / get_asset_info / get_mcp_config / selected_actors
            level_actors / get_actor_property / get_component_property
            list_blueprints / get_bp_info / blueprint_get_event_graph_info
            blueprint_export_spec / blueprint_get_function_signature
-           blueprint_search_functions / pie_is_running / get_actor_state
-           search_input_actions / get_input_action_info
+           blueprint_search_functions / blueprint_get_cdo_property / pie_is_running
+           get_actor_state / search_input_actions / get_input_action_info
            search_input_mapping_contexts / get_input_mapping_context_info
+           list_gameplay_tags / search_gameplay_tags
            list_materials / get_material_info / list_widgets / get_widget_info
            viewport_screenshot / get_dirty_packages / widget_get_property_schema
            widget_get_slot_schema / widget_find
 
-Write (54): spawn_actor / set_transform / actor_set_property / save_level
+Write (60): spawn_actor / set_transform / actor_set_property / save_level
             delete_actor / set_component_property / begin/end/undo/redo
             create_blueprint / blueprint_add_variable / blueprint_add_function
             blueprint_add_component / blueprint_create_actor_class
@@ -55,6 +56,8 @@ Write (54): spawn_actor / set_transform / actor_set_property / save_level
             blueprint_set_pin_default / blueprint_remove_node
             blueprint_disconnect_pins / blueprint_remove_variable
             blueprint_set_variable_default / blueprint_set_component_default
+            blueprint_set_cdo_property / blueprint_add_cdo_array
+            blueprint_remove_cdo_array / create_gameplay_tag
             pie_start / pie_stop / set_level_default_pawn
             create_input_action / delete_input_action / create_input_mapping_context
             delete_input_mapping_context / add_input_mapping / remove_input_mapping

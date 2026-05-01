@@ -201,3 +201,83 @@ bool FMCPBlueprintSetComponentDefaultHandler::Execute(TSharedPtr<FJsonObject> Pa
 	OutResult->SetStringField(TEXT("value"), ReadBack);
 	return true;
 }
+
+// ====== 阶段 19 CDO 通用属性 (4 Handler) ======
+
+bool FMCPBlueprintGetCDOPropertyHandler::Execute(TSharedPtr<FJsonObject> Payload, TSharedPtr<FJsonObject>& OutResult, FString& OutErrorCode, FString& OutErrorMessage)
+{
+	FString AssetPath, PropertyName;
+	if (!Payload.IsValid() || !Payload->TryGetStringField(TEXT("asset_path"), AssetPath) || !Payload->TryGetStringField(TEXT("property_name"), PropertyName))
+	{ MCPBridgeHelpers::BuildErrorResponse(TEXT("MISSING_PARAM"), TEXT("asset_path and property_name required"), OutErrorCode, OutErrorMessage); return false; }
+	UBlueprint* BP = MCPBlueprintGraphHelpers::LoadBlueprint(AssetPath, OutErrorCode, OutErrorMessage); if (!BP) return false;
+	if (!BP->GeneratedClass) { MCPBridgeHelpers::BuildErrorResponse(TEXT("CREATE_FAILED"), TEXT("Blueprint not compiled"), OutErrorCode, OutErrorMessage); return false; }
+	UObject* CDO = BP->GeneratedClass->GetDefaultObject(); if (!CDO) { MCPBridgeHelpers::BuildErrorResponse(TEXT("CREATE_FAILED"), TEXT("No CDO"), OutErrorCode, OutErrorMessage); return false; }
+	FProperty* Prop = BP->GeneratedClass->FindPropertyByName(FName(*PropertyName));
+	if (!Prop) { MCPBridgeHelpers::BuildErrorResponse(TEXT("PROPERTY_NOT_FOUND"), FString::Printf(TEXT("Property '%s' not found"), *PropertyName), OutErrorCode, OutErrorMessage); return false; }
+
+	void* Addr = Prop->ContainerPtrToValuePtr<void>(CDO);
+	FString Value; Prop->ExportTextItem_Direct(Value, Addr, nullptr, nullptr, PPF_None);
+	OutResult = MakeShareable(new FJsonObject()); OutResult->SetStringField(TEXT("asset_path"), AssetPath);
+	OutResult->SetStringField(TEXT("property_name"), PropertyName); OutResult->SetStringField(TEXT("value"), Value);
+	OutResult->SetStringField(TEXT("cpp_type"), Prop->GetCPPType());
+	return true;
+}
+
+bool FMCPBlueprintSetCDOPropertyHandler::Execute(TSharedPtr<FJsonObject> Payload, TSharedPtr<FJsonObject>& OutResult, FString& OutErrorCode, FString& OutErrorMessage)
+{
+	FString AssetPath, PropertyName, Value;
+	if (!Payload.IsValid() || !Payload->TryGetStringField(TEXT("asset_path"), AssetPath) || !Payload->TryGetStringField(TEXT("property_name"), PropertyName))
+	{ MCPBridgeHelpers::BuildErrorResponse(TEXT("MISSING_PARAM"), TEXT("asset_path and property_name required"), OutErrorCode, OutErrorMessage); return false; }
+	Payload->TryGetStringField(TEXT("value"), Value);
+	UBlueprint* BP = MCPBlueprintGraphHelpers::LoadBlueprint(AssetPath, OutErrorCode, OutErrorMessage); if (!BP) return false;
+	if (!BP->GeneratedClass) { MCPBridgeHelpers::BuildErrorResponse(TEXT("CREATE_FAILED"), TEXT("Not compiled"), OutErrorCode, OutErrorMessage); return false; }
+	UObject* CDO = BP->GeneratedClass->GetDefaultObject(); if (!CDO) { MCPBridgeHelpers::BuildErrorResponse(TEXT("CREATE_FAILED"), TEXT("No CDO"), OutErrorCode, OutErrorMessage); return false; }
+	FProperty* Prop = BP->GeneratedClass->FindPropertyByName(FName(*PropertyName));
+	if (!Prop) { MCPBridgeHelpers::BuildErrorResponse(TEXT("PROPERTY_NOT_FOUND"), TEXT("Property not found"), OutErrorCode, OutErrorMessage); return false; }
+	BP->Modify(); void* Addr = Prop->ContainerPtrToValuePtr<void>(CDO);
+	if (!Prop->ImportText_Direct(*Value, Addr, CDO, PPF_None)) { MCPBridgeHelpers::BuildErrorResponse(TEXT("SET_FAILED"), TEXT("ImportText failed"), OutErrorCode, OutErrorMessage); return false; }
+	FString ReadBack; Prop->ExportTextItem_Direct(ReadBack, Addr, nullptr, nullptr, PPF_None);
+	FBlueprintEditorUtils::MarkBlueprintAsModified(BP);
+	OutResult = MakeShareable(new FJsonObject()); OutResult->SetStringField(TEXT("asset_path"), AssetPath);
+	OutResult->SetStringField(TEXT("property_name"), PropertyName); OutResult->SetStringField(TEXT("value"), ReadBack);
+	return true;
+}
+
+bool FMCPBlueprintAddCDOArrayHandler::Execute(TSharedPtr<FJsonObject> Payload, TSharedPtr<FJsonObject>& OutResult, FString& OutErrorCode, FString& OutErrorMessage)
+{
+	FString AssetPath, PropertyName, Value;
+	if (!Payload.IsValid() || !Payload->TryGetStringField(TEXT("asset_path"), AssetPath) || !Payload->TryGetStringField(TEXT("property_name"), PropertyName))
+	{ MCPBridgeHelpers::BuildErrorResponse(TEXT("MISSING_PARAM"), TEXT("asset_path and property_name required"), OutErrorCode, OutErrorMessage); return false; }
+	Payload->TryGetStringField(TEXT("value"), Value);
+	UBlueprint* BP = MCPBlueprintGraphHelpers::LoadBlueprint(AssetPath, OutErrorCode, OutErrorMessage); if (!BP) return false;
+	if (!BP->GeneratedClass) { MCPBridgeHelpers::BuildErrorResponse(TEXT("CREATE_FAILED"), TEXT("Not compiled"), OutErrorCode, OutErrorMessage); return false; }
+	UObject* CDO = BP->GeneratedClass->GetDefaultObject(); if (!CDO) { MCPBridgeHelpers::BuildErrorResponse(TEXT("CREATE_FAILED"), TEXT("No CDO"), OutErrorCode, OutErrorMessage); return false; }
+	FArrayProperty* ArrProp = CastField<FArrayProperty>(BP->GeneratedClass->FindPropertyByName(FName(*PropertyName)));
+	if (!ArrProp) { MCPBridgeHelpers::BuildErrorResponse(TEXT("PROPERTY_NOT_FOUND"), FString::Printf(TEXT("Array '%s' not found"), *PropertyName), OutErrorCode, OutErrorMessage); return false; }
+	void* ArrAddr = ArrProp->ContainerPtrToValuePtr<void>(CDO); FScriptArrayHelper Helper(ArrProp, ArrAddr);
+	BP->Modify(); int32 NewIdx = Helper.AddValue();
+	if (!Value.IsEmpty()) { FProperty* Inner = ArrProp->Inner; void* Elem = Helper.GetRawPtr(NewIdx); Inner->ImportText_Direct(*Value, Elem, CDO, PPF_None); }
+	FBlueprintEditorUtils::MarkBlueprintAsModified(BP);
+	OutResult = MakeShareable(new FJsonObject()); OutResult->SetStringField(TEXT("asset_path"), AssetPath);
+	OutResult->SetStringField(TEXT("property_name"), PropertyName); OutResult->SetNumberField(TEXT("new_index"), NewIdx); OutResult->SetNumberField(TEXT("new_count"), Helper.Num());
+	return true;
+}
+
+bool FMCPBlueprintRemoveCDOArrayHandler::Execute(TSharedPtr<FJsonObject> Payload, TSharedPtr<FJsonObject>& OutResult, FString& OutErrorCode, FString& OutErrorMessage)
+{
+	FString AssetPath, PropertyName;
+	if (!Payload.IsValid() || !Payload->TryGetStringField(TEXT("asset_path"), AssetPath) || !Payload->TryGetStringField(TEXT("property_name"), PropertyName))
+	{ MCPBridgeHelpers::BuildErrorResponse(TEXT("MISSING_PARAM"), TEXT("asset_path and property_name required"), OutErrorCode, OutErrorMessage); return false; }
+	int32 Index = 0; if (Payload.IsValid()) Payload->TryGetNumberField(TEXT("index"), Index);
+	UBlueprint* BP = MCPBlueprintGraphHelpers::LoadBlueprint(AssetPath, OutErrorCode, OutErrorMessage); if (!BP) return false;
+	if (!BP->GeneratedClass) { MCPBridgeHelpers::BuildErrorResponse(TEXT("CREATE_FAILED"), TEXT("Not compiled"), OutErrorCode, OutErrorMessage); return false; }
+	UObject* CDO = BP->GeneratedClass->GetDefaultObject(); if (!CDO) { MCPBridgeHelpers::BuildErrorResponse(TEXT("CREATE_FAILED"), TEXT("No CDO"), OutErrorCode, OutErrorMessage); return false; }
+	FArrayProperty* ArrProp = CastField<FArrayProperty>(BP->GeneratedClass->FindPropertyByName(FName(*PropertyName)));
+	if (!ArrProp) { MCPBridgeHelpers::BuildErrorResponse(TEXT("PROPERTY_NOT_FOUND"), TEXT("Array not found"), OutErrorCode, OutErrorMessage); return false; }
+	void* ArrAddr = ArrProp->ContainerPtrToValuePtr<void>(CDO); FScriptArrayHelper Helper(ArrProp, ArrAddr);
+	if (Index < 0 || Index >= Helper.Num()) { MCPBridgeHelpers::BuildErrorResponse(TEXT("NOT_FOUND"), TEXT("Index out of range"), OutErrorCode, OutErrorMessage); return false; }
+	BP->Modify(); Helper.RemoveValues(Index, 1); FBlueprintEditorUtils::MarkBlueprintAsModified(BP);
+	OutResult = MakeShareable(new FJsonObject()); OutResult->SetStringField(TEXT("asset_path"), AssetPath);
+	OutResult->SetStringField(TEXT("property_name"), PropertyName); OutResult->SetNumberField(TEXT("removed_index"), Index); OutResult->SetNumberField(TEXT("new_count"), Helper.Num());
+	return true;
+}
