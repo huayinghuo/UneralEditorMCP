@@ -11,6 +11,10 @@
 #include "Handlers/MCPDirtyHandlers.h"
 #include "Handlers/MCPBlueprintGraphHandlers.h"
 #include "Handlers/MCPBlueprintSpecHandlers.h"
+#include "Handlers/MCPBlueprintAdvancedHandlers.h"
+#include "Handlers/MCPBlueprintUtilityHandlers.h"
+#include "Handlers/MCPPIERuntimeHandlers.h"
+#include "Handlers/MCPEnhancedInputHandlers.h"
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonWriter.h"
@@ -84,6 +88,39 @@ void FMCPBridgeServer::RegisterHandlers()
 	// Blueprint Spec 编辑（2 个）
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPApplyBlueprintSpecHandler()));
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPExportBlueprintSpecHandler()));
+	// Blueprint Advanced 编辑（7 个）
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPAddNodeByClassHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPAddVariableNodeHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPSetPinDefaultHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPGetFunctionSignatureHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPRemoveNodeHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPDisconnectPinsHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPRemoveVariableHandler()));
+	// Blueprint Utility（3 个）
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPBlueprintSearchFunctionsHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPBlueprintSetVariableDefaultHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPBlueprintSetComponentDefaultHandler()));
+	// PIE Runtime（5 个）
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPPIEStartHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPPIEStopHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPPIEIsRunningHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPGetActorStateHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPSetLevelDefaultPawnHandler()));
+	// Enhanced Input（14 个 — Stage 18C）
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPSearchInputActionsHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPCreateInputActionHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPGetInputActionInfoHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPDeleteInputActionHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPSearchIMCHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPCreateIMCHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPGetIMCInfoHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPDeleteIMCHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPAddMappingHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPRemoveMappingHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPSetMappingActionHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPSetMappingKeyHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPBPEnhancedActionHandler()));
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPBPIMCNodeHandler()));
 	// Viewport（1 个）
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPViewportScreenshotHandler()));
 	// Material（5 个）

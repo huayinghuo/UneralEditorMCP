@@ -114,10 +114,11 @@ namespace MCPBlueprintGraphHelpers
 
 		EventNode->EventReference.SetExternalMember(MemberName, ParentClass);
 		EventNode->CreateNewGuid();
-		EventNode->AllocateDefaultPins();
 		EventNode->NodePosX = 0;
 		EventNode->NodePosY = Graph->Nodes.Num() * 200;
 		Graph->AddNode(EventNode, false, false);
+		EventNode->PostPlacedNewNode();
+		EventNode->AllocateDefaultPins();
 
 		FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(CastChecked<UBlueprint>(Graph->GetOuter()));
 

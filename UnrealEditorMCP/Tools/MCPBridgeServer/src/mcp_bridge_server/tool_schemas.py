@@ -1,4 +1,4 @@
-"""MCP Tool Schema 注册表 —— 48 个 tool 的 action→（名称/描述/参数schema）映射
+"""MCP Tool Schema 注册表 —— 87 个 tool 的 action→（名称/描述/参数schema）映射
 
 C++ Handler 通过 get_mcp_config 暴露 action 列表，Python 端从此注册表取 schema，
 两者取交集生成最终 tool 列表，避免手工双写漂移。
@@ -424,6 +424,268 @@ TOOL_SCHEMAS = {
             },
             "required": ["asset_path"],
         },
+    },
+    # ---- Blueprint Advanced (Stage 17) ----
+    "blueprint_add_node_by_class": {
+        "name": "ue_blueprint_add_node_by_class",
+        "description": "Create any K2Node by class name (Branch, Sequence, Comparison, etc.) — generic node factory for non-specialized graph nodes",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "asset_path": {"type": "string"},
+                "node_class": {"type": "string", "description": "K2Node class name (e.g., K2Node_IfThenElse, K2Node_ExecutionSequence)"},
+                "graph_name": {"type": "string"},
+                "pos_x": {"type": "number"},
+                "pos_y": {"type": "number"},
+            },
+            "required": ["asset_path", "node_class"],
+        },
+    },
+    "blueprint_add_variable_node": {
+        "name": "ue_blueprint_add_variable_node",
+        "description": "Create a Get or Set Variable node in the graph for reading/writing a Blueprint member variable",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "asset_path": {"type": "string"},
+                "variable_name": {"type": "string"},
+                "node_type": {"type": "string", "description": "'get' or 'set'"},
+                "graph_name": {"type": "string"},
+                "pos_x": {"type": "number"},
+                "pos_y": {"type": "number"},
+            },
+            "required": ["asset_path", "variable_name", "node_type"],
+        },
+    },
+    "blueprint_set_pin_default": {
+        "name": "ue_blueprint_set_pin_default",
+        "description": "Set the default value of any input pin on a graph node",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "asset_path": {"type": "string"},
+                "graph_name": {"type": "string"},
+                "node_guid": {"type": "string"},
+                "pin_name": {"type": "string"},
+                "default_value": {"type": "string"},
+            },
+            "required": ["asset_path", "node_guid", "pin_name"],
+        },
+    },
+    "blueprint_get_function_signature": {
+        "name": "ue_blueprint_get_function_signature",
+        "description": "Get the full parameter signature of a BlueprintCallable function (pins, types, defaults)",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "function_name": {"type": "string"},
+            },
+            "required": ["function_name"],
+        },
+    },
+    "blueprint_remove_node": {
+        "name": "ue_blueprint_remove_node",
+        "description": "Remove a node from the Blueprint graph by GUID",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "asset_path": {"type": "string"},
+                "graph_name": {"type": "string"},
+                "node_guid": {"type": "string"},
+            },
+            "required": ["asset_path", "node_guid"],
+        },
+    },
+    "blueprint_disconnect_pins": {
+        "name": "ue_blueprint_disconnect_pins",
+        "description": "Break all connections on a specific pin of a graph node",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "asset_path": {"type": "string"},
+                "graph_name": {"type": "string"},
+                "node_guid": {"type": "string"},
+                "pin_name": {"type": "string"},
+            },
+            "required": ["asset_path", "node_guid", "pin_name"],
+        },
+    },
+    "blueprint_remove_variable": {
+        "name": "ue_blueprint_remove_variable",
+        "description": "Remove a member variable from the Blueprint",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "asset_path": {"type": "string"},
+                "variable_name": {"type": "string"},
+            },
+            "required": ["asset_path", "variable_name"],
+        },
+    },
+    # ---- Blueprint Utility (Stage 18A) ----
+    "blueprint_search_functions": {
+        "name": "ue_blueprint_search_functions",
+        "description": "Search for BlueprintCallable functions by keyword (optional class filter, max results cap)",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "search_term": {"type": "string", "description": "Substring to match in function name (case-insensitive)"},
+                "class_name": {"type": "string", "description": "Optional: filter by owning class name"},
+                "with_context": {"type": "boolean", "description": "Include owning class name in results"},
+                "max_results": {"type": "number", "description": "Max results (default 50)"},
+            },
+            "required": ["search_term"],
+        },
+    },
+    "blueprint_set_variable_default": {
+        "name": "ue_blueprint_set_variable_default",
+        "description": "Set the CDO default value of a Blueprint member variable (requires BP to be compiled first)",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "asset_path": {"type": "string"},
+                "variable_name": {"type": "string"},
+                "default_value": {"type": "string", "description": "String representation of the default value (e.g., '42', 'true', '(X=0,Y=0,Z=100)')"},
+            },
+            "required": ["asset_path", "variable_name"],
+        },
+    },
+    "blueprint_set_component_default": {
+        "name": "ue_blueprint_set_component_default",
+        "description": "Set the default property value on a Blueprint-created component (SCS component template)",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "asset_path": {"type": "string"},
+                "component_name": {"type": "string", "description": "Variable name of the SCS component"},
+                "property_name": {"type": "string"},
+                "value": {"type": "string"},
+            },
+            "required": ["asset_path", "component_name", "property_name"],
+        },
+    },
+    # ---- PIE Runtime (Stage 18B) ----
+    "pie_start": {
+        "name": "ue_pie_start",
+        "description": "Start Play In Editor (PIE) session",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "simulate": {"type": "boolean", "description": "Start as simulate (no player controller, default false)"},
+            },
+            "required": [],
+        },
+    },
+    "pie_stop": {
+        "name": "ue_pie_stop",
+        "description": "Stop the current Play In Editor session",
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
+    "pie_is_running": {
+        "name": "ue_pie_is_running",
+        "description": "Check if a Play In Editor session is currently running",
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
+    "get_actor_state": {
+        "name": "ue_get_actor_state",
+        "description": "Get an actor's runtime state (position, rotation, velocity) during PIE",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "actor_name": {"type": "string", "description": "Actor name or label to search for"},
+            },
+            "required": ["actor_name"],
+        },
+    },
+    "set_level_default_pawn": {
+        "name": "ue_set_level_default_pawn",
+        "description": "Set the default Pawn class for the current level's WorldSettings",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "pawn_class": {"type": "string", "description": "Pawn class name (e.g., Character, Pawn)"},
+            },
+            "required": ["pawn_class"],
+        },
+    },
+    # ---- Enhanced Input (Stage 18C) — 14 handlers ----
+    "search_input_actions": {
+        "name": "ue_search_input_actions",
+        "description": "Search InputAction assets by name",
+        "inputSchema": {"type":"object","properties":{"search_term":{"type":"string"},"max_results":{"type":"number"}},"required":[]},
+    },
+    "create_input_action": {
+        "name": "ue_create_input_action",
+        "description": "Create a new InputAction asset",
+        "inputSchema": {"type":"object","properties":{"name":{"type":"string"},"path":{"type":"string"},"value_type":{"type":"string","description":"bool/float/vector2d/vector3d"}},"required":["name"]},
+    },
+    "get_input_action_info": {
+        "name": "ue_get_input_action_info",
+        "description": "Get InputAction asset details (name, path, value_type)",
+        "inputSchema": {"type":"object","properties":{"asset_path":{"type":"string"}},"required":["asset_path"]},
+    },
+    "delete_input_action": {
+        "name": "ue_delete_input_action",
+        "description": "Delete an InputAction asset",
+        "inputSchema": {"type":"object","properties":{"asset_path":{"type":"string"}},"required":["asset_path"]},
+    },
+    "search_input_mapping_contexts": {
+        "name": "ue_search_input_mapping_contexts",
+        "description": "Search InputMappingContext assets by name",
+        "inputSchema": {"type":"object","properties":{"search_term":{"type":"string"},"max_results":{"type":"number"}},"required":[]},
+    },
+    "create_input_mapping_context": {
+        "name": "ue_create_input_mapping_context",
+        "description": "Create a new InputMappingContext asset",
+        "inputSchema": {"type":"object","properties":{"name":{"type":"string"},"path":{"type":"string"}},"required":["name"]},
+    },
+    "get_input_mapping_context_info": {
+        "name": "ue_get_input_mapping_context_info",
+        "description": "Get InputMappingContext details (name, path, mappings with action/key/modifiers/triggers)",
+        "inputSchema": {"type":"object","properties":{"asset_path":{"type":"string"}},"required":["asset_path"]},
+    },
+    "delete_input_mapping_context": {
+        "name": "ue_delete_input_mapping_context",
+        "description": "Delete an InputMappingContext asset",
+        "inputSchema": {"type":"object","properties":{"asset_path":{"type":"string"}},"required":["asset_path"]},
+    },
+    "add_input_mapping": {
+        "name": "ue_add_input_mapping",
+        "description": "Add a key mapping (InputAction + Key) to an InputMappingContext",
+        "inputSchema": {"type":"object","properties":{"context_path":{"type":"string"},"action_path":{"type":"string"},"key":{"type":"string"}},"required":["context_path","action_path","key"]},
+    },
+    "remove_input_mapping": {
+        "name": "ue_remove_input_mapping",
+        "description": "Remove a key mapping from an InputMappingContext (by index or key match)",
+        "inputSchema": {"type":"object","properties":{"context_path":{"type":"string"},"key":{"type":"string"},"index":{"type":"number"}},"required":["context_path","key"]},
+    },
+    "set_input_mapping_action": {
+        "name": "ue_set_input_mapping_action",
+        "description": "Change the InputAction assigned to an existing mapping in an InputMappingContext",
+        "inputSchema": {"type":"object","properties":{"context_path":{"type":"string"},"action_path":{"type":"string"},"index":{"type":"number"}},"required":["context_path","action_path","index"]},
+    },
+    "set_input_mapping_key": {
+        "name": "ue_set_input_mapping_key",
+        "description": "Change the key assigned to an existing mapping in an InputMappingContext",
+        "inputSchema": {"type":"object","properties":{"context_path":{"type":"string"},"key":{"type":"string"},"index":{"type":"number"}},"required":["context_path","key","index"]},
+    },
+    "blueprint_add_enhanced_input_node": {
+        "name": "ue_blueprint_add_enhanced_input_node",
+        "description": "Add an Enhanced Input Action event node to a Blueprint EventGraph (triggered/canceled/completed etc.)",
+        "inputSchema": {"type":"object","properties":{"asset_path":{"type":"string"},"action_path":{"type":"string"},"event_type":{"type":"string","description":"triggered/started/ongoing/canceled/completed"}},"required":["asset_path","action_path"]},
+    },
+    "blueprint_add_imc_node": {
+        "name": "ue_blueprint_add_imc_node",
+        "description": "Add a node to add or remove an InputMappingContext in a Blueprint graph",
+        "inputSchema": {"type":"object","properties":{"asset_path":{"type":"string"},"context_path":{"type":"string"}},"required":["asset_path","context_path"]},
     },
     # ---- Material ----
     "list_materials": {

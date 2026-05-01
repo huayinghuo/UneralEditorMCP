@@ -30,3 +30,9 @@
 [2026-04-30] 阶段 14A：资源契约统一 + 测试分层（runtime/status 字段一致化，Layer 1 TCP / Layer 2 MCP protocol 双模，27/27 通过）
 [2026-04-30] 阶段 15A：BridgeClient 并发串行化（threading.Lock）+ README/plan_sync/plan_index/dev_last 收口
 [2026-04-30] 阶段 16 Slice 1-4：Widget 能力完整深化（50→58 Handler，11 新增 + 2 增强，26/26 验收通过）
+[2026-05-01] 阶段 17 命令式路径：7 Handler + helpers + 11B spec 扩展（58→65 Handler，编译通过）
+[2026-05-01] 阶段 17 验收修复：apply_spec dispatch 补齐 3 节点类型 + README 同步 + test_stage17.ps1 创建（9/9 测试通过）
+[2026-05-01] 阶段 18A：函数搜索+CDO默认值（3 Handler, 65→68, 编译通过）
+[2026-05-01] 阶段 18B：PIE 运行时控制（5 Handler, 68→73, 编译通过）
+[2026-05-01] 阶段 18C：Enhanced Input 完整模块（14 Handler, 73→87, 编译通过）
+[2026-05-01] GAS 文档分工：`GASPlan/gas-game-plan.md` 写游戏项目计划，`.kilo/gas/gas-game-plan.md` 写 MCP 需求项

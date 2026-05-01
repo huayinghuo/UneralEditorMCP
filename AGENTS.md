@@ -8,9 +8,9 @@
 | 项目文件 | `E:\UEProject\UnrealEditorMCP\UnrealEditorMCP\UnrealEditorMCP.uproject` |
 | 插件 | `UnrealEditorMCP\Plugins\UnrealEditorMCPBridge\` |
 | MCP 端口 | TCP 9876 |
-| Handler 数 | 58（Read 26 / Write 31 / Dangerous 1） |
+| Handler 数 | 87（Read 32 / Write 54 / Dangerous 1） |
 | 连接模型 | **单客户端独占** — 同一时刻只允许一个 TCP 客户端，第二连接被拒绝（`CLIENT_ALREADY_CONNECTED`） |
-| 计划文档 | `.ai/plan/plan.md`（内层） + 外部主计划 `C:\Users\萤火\.local\share\kilo\plans\1777390210726-swift-squid.md` |
+| 计划文档 | `.ai/plan/plan.md`（内层） + 外部主计划 `.kilo/plans/1777390210726-swift-squid.md` |
 
 ---
 
@@ -204,6 +204,38 @@ $r = Send-Request "get_bridge_runtime_status"
 ---
 
 ## 3. 代码模式
+
+### 3.0 注释规范
+
+- **类/结构体/枚举**：声明处必须有中文注释说明职责和用途
+- **公共方法/属性**：必须有中文注释说明功能、参数含义、返回值
+- **重要逻辑分支/生命周期/状态机**：必须有一行中文注释解释意图
+- **错误路径**：每个 `BuildErrorResponse` 前应有中文注释说明触发条件
+- **Python 文件**：文件级 docstring 必须用中文，关键函数需中文注释
+
+```cpp
+// === 头文件示例 ===
+/** 通用 K2 节点工厂：根据类名动态创建任意非专用 UEdGraphNode（Branch/Sequence/Comparison 等） */
+class FMCPAddNodeByClassHandler : public IMCPBridgeHandler { ... };
+
+// === 实现文件示例 ===
+/** 加载 Blueprint 资产，失败时设置 BP_NOT_FOUND 错误 */
+UBlueprint* LoadBlueprint(...);
+
+// 先尝试原始类名查找，再补 K2Node_ 前缀
+OutClass = FindFirstObject<UClass>(*NodeClassName, ...);
+if (!OutClass)
+{
+    FString Prefixed = TEXT("K2Node_") + NodeClassName;
+    OutClass = FindFirstObject<UClass>(*Prefixed, ...);
+}
+// 排除需要专用命令的节点类型（Event/CallFunction/Variable）
+if (OutClass == UK2Node_Event::StaticClass())
+{
+    OutErrorCode = TEXT("SPECIALIZED_NODE_CLASS");  // 触发条件：企图用通用工厂创建专用节点
+    ...
+}
+```
 
 ### 3.1 新增 Handler 的完整步骤
 

@@ -1,8 +1,8 @@
 # Unreal Editor MCP Bridge 开发计划
 
-> 详细规划见外部文件：`C:\Users\萤火\.local\share\kilo\plans\1777390210726-swift-squid.md`
+> 详细规划见外部文件：`.kilo/plans/1777390210726-swift-squid.md`
 
-## 实施状态（2026-04-30）
+## 实施状态（2026-05-01）
 
 | 阶段 | 内容 | 状态 |
 |------|------|------|
@@ -20,31 +20,46 @@
 | 10B | **治理闭环**（ini 配置 / get_mcp_config 端到端 / 队列丢弃 / 写语义统一 / BP 重名检测） | ✅ |
 | 11A | **受控 Blueprint 图编辑**（6 Handler：创建 Actor BP / EventGraph 信息 / 事件节点 / CallFunction 节点 / 连线 / 编译保存） | ✅ |
 | 13 | **仓库治理**（.gitignore / .editorconfig / .gitattributes / README.md） | ✅ |
-| **10C** | **Python 侧自举配置收敛**（ue_get_mcp_config 自举 / 在线覆盖 / 断连退化 / list_tools 统一配置源） | ✅ |
-| **11B** | **声明式 Blueprint 图重建**（blueprint_apply_spec / blueprint_export_spec，spec → nodes + edges → BP） | ✅ |
-| **12A** | **传输层稳态化与可观测性收口**（runtime status 诊断 + 单客户端策略固定 + Python 错误分类 + 验收脚本） | ✅ |
-| **14** | **MCP Resources 知识层**（4 static + 2 live resources） | ✅ |
+| **10C** | **Python 侧自举配置收敛** | ✅ |
+| **11B** | **声明式 Blueprint 图重建**（apply_spec / export_spec） | ✅ |
+| **12A** | **传输层稳态化与可观测性收口** | ✅ |
+| **14** | **MCP Resources 知识层**（4 static + 2 live） | ✅ |
 | **14A** | **Resources 契约统一 + 测试分层** | ✅ |
 | **15A** | **BridgeClient 并发串行化** | ✅ |
-| **16** | **Widget 能力完整深化**（50→58 Handler，11 新增 + 2 增强，28/28 验收通过） | ✅ |
+| **16** | **Widget 能力完整深化**（50→58 Handler） | ✅ |
+| **17** | **Blueprint 图编辑对齐参考项目**（58→65 Handler，7 新命令） | ✅ |
+| **18** | **函数搜索 + PIE 运行时 + Enhanced Input 完整栈**（65→87 Handler，18A+18B+18C 全部验收通过） | ✅ |
 
-## Handler 清单（58 个）
+## Handler 清单（87 个）
 
 ```
-Read (26): ping / get_bridge_runtime_status / editor_info / project_info / world_state
+Read (32): ping / get_bridge_runtime_status / editor_info / project_info / world_state
            list_assets / get_asset_info / get_mcp_config / selected_actors
            level_actors / get_actor_property / get_component_property
            list_blueprints / get_bp_info / blueprint_get_event_graph_info
-           blueprint_export_spec / list_materials / get_material_info
-           list_widgets / get_widget_info / viewport_screenshot / get_dirty_packages
-           widget_get_property_schema / widget_get_slot_schema / widget_find
+           blueprint_export_spec / blueprint_get_function_signature
+           blueprint_search_functions / pie_is_running / get_actor_state
+           search_input_actions / get_input_action_info
+           search_input_mapping_contexts / get_input_mapping_context_info
+           list_materials / get_material_info / list_widgets / get_widget_info
+           viewport_screenshot / get_dirty_packages / widget_get_property_schema
+           widget_get_slot_schema / widget_find
 
-Write (31): spawn_actor / set_transform / actor_set_property / save_level
+Write (54): spawn_actor / set_transform / actor_set_property / save_level
             delete_actor / set_component_property / begin/end/undo/redo
             create_blueprint / blueprint_add_variable / blueprint_add_function
             blueprint_add_component / blueprint_create_actor_class
             blueprint_add_event_node / blueprint_add_call_function_node
             blueprint_connect_pins / blueprint_compile_save / blueprint_apply_spec
+            blueprint_add_node_by_class / blueprint_add_variable_node
+            blueprint_set_pin_default / blueprint_remove_node
+            blueprint_disconnect_pins / blueprint_remove_variable
+            blueprint_set_variable_default / blueprint_set_component_default
+            pie_start / pie_stop / set_level_default_pawn
+            create_input_action / delete_input_action / create_input_mapping_context
+            delete_input_mapping_context / add_input_mapping / remove_input_mapping
+            set_input_mapping_action / set_input_mapping_key
+            blueprint_add_enhanced_input_node / blueprint_add_imc_node
             create_widget_bp / widget_add_child / widget_remove_child
             widget_set_property / widget_set_root / widget_reparent
             widget_reorder_child / widget_rename / widget_set_slot_property

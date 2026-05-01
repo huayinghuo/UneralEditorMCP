@@ -41,7 +41,7 @@ bool FMCPCreateActorBlueprintClassHandler::Execute(TSharedPtr<FJsonObject> Paylo
 		ParentClass = FindFirstObject<UClass>(*WithPrefix, EFindFirstObjectOptions::None, ELogVerbosity::NoLogging);
 	}
 
-	FString PackagePath = TEXT("/Game/Blueprints");
+	FString PackagePath = TEXT("/Game/MCPTest");
 	if (Payload.IsValid())
 	{
 		Payload->TryGetStringField(TEXT("path"), PackagePath);
@@ -256,10 +256,11 @@ bool FMCPBlueprintAddCallFunctionNodeHandler::Execute(TSharedPtr<FJsonObject> Pa
 
 	CallNode->SetFromFunction(Function);
 	CallNode->CreateNewGuid();
-	CallNode->AllocateDefaultPins();
 	CallNode->NodePosX = 400;
 	CallNode->NodePosY = TargetGraph->Nodes.Num() * 200;
 	TargetGraph->AddNode(CallNode, false, false);
+	CallNode->PostPlacedNewNode();
+	CallNode->AllocateDefaultPins();
 
 	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(BP);
 

@@ -1,50 +1,26 @@
 # Last Operation
 
-Session: 2026-04-30 15:14
-Phase: 阶段 16 — Widget 能力完整深化
-Status: ✅ 58 Handler，28/28 验收通过
+Session: 2026-05-01 20:36
+Phase: GAS 文档分工修正
+Status: ✅ `GASPlan/gas-game-plan.md` 写游戏项目计划，`.kilo/gas/gas-game-plan.md` 写 MCP 需求项
 
-## 阶段 15A — BridgeClient 并发串行化
+## 本次交付
 
-- `bridge_client.py`：新增 `threading.Lock`，`send()` 全流程在锁内
-- 消除 `list_tools` / `call_tool` / `read_resource` 并发共享 socket 竞争
+| 文件 | 内容 |
+|------|------|
+| `GASPlan/gas-game-plan.md` | GAS 学习、项目本体开发、多人同步验证的游戏项目计划 |
+| `.kilo/gas/gas-game-plan.md` | GAS 阶段推进过程中沉淀的 MCP 能力需求项 |
+| `.ai/plan/plan_log.md` | 追加 GAS 计划创建记录 |
+| `.ai/log/log.md` | 追加操作日志索引 |
+| `.ai/log/2026/05/01/2026-05-01-003.md` | 记录本次计划创建细节 |
 
-## 阶段 16 — Widget 能力完整深化
+## 关键结论
 
-### Slice 1 — 查询与自描述 (+3 Handler，50→53)
-- 增强 `get_widget_info`：root_widget, parent, slot_class, is_variable
-- `widget_get_property_schema`：可编辑属性列表 (name/type/editable/read_only)
-- `widget_get_slot_schema`：slot class + 可编辑属性
-- `widget_find`：按 name/class 搜索树节点
+- 游戏方向：地牢战斗肉鸽，参考灰烬之国类战斗体验，优先实现完整战斗系统。
+- 实现边界：GAS 游戏代码进入 `UnrealEditorMCP/Source/UnrealEditorMCP/`，不放入 MCP 插件。
+- 文档边界：`GASPlan/gas-game-plan.md` 写游戏项目计划；`.kilo/gas/gas-game-plan.md` 只写 MCP 需求项。
+- MCP 复盘：每个 GAS 阶段结束后，将自动化能力缺口追加到 `.kilo/gas/gas-game-plan.md`。
 
-### Slice 2 — 结构编辑 (+4 Handler，53→57)
-- `widget_set_root`：设定/替换 root widget
-- `widget_reparent`：移动节点 + 循环引用检测
-- `widget_reorder_child`：调整 sibling 顺序
-- `widget_rename`：重命名 + 冲突检测
+## Next
 
-### Slice 3 — Slot 编辑 + 属性类型增强 (+1 Handler，57→58)
-- `widget_set_slot_property`：设置 slot 布局属性
-- 增强 `widget_set_property`：支持 string / number / boolean typed value
-
-### Slice 5 — 高阶树操作
-- `widget_duplicate`：复制节点/子树 (DuplicateObject)
-- `widget_wrap_with_panel`：用 Border/SizeBox 等包裹节点
-- 增强 `create_widget_blueprint`：可选 root_widget_class
-- 增强 `widget_add_child`：可选 index 位置
-
-### 新增错误码
-ROOT_ALREADY_EXISTS, PARENT_NOT_PANEL, REPARENT_CYCLE_FORBIDDEN,
-WIDGET_NAME_CONFLICT, WIDGET_DUPLICATE_FAILED, WIDGET_WRAP_FAILED,
-SLOT_NOT_FOUND, SLOT_PROPERTY_NOT_SUPPORTED
-
-### 验收
-- `test_stage16_widget_deep.ps1`：8 Parts，28 assertions
-- 正向：创建含root + 5节点树 + 查询 + 属性/slot编辑 + reparent/rename/duplicate/wrap + root replace + 旧子树消失断言 + 编译保存
-- 错误：CLASS_NOT_FOUND, REPARENT_CYCLE, NAME_CONFLICT, PROPERTY_NOT_FOUND, SLOT_NOT_SUPPORTED
-- 结果：28/28 PASS, 0 FAIL
-
-## 项目当前状态
-Handler: 58 (Read 26 / Write 31 / Dangerous 1)
-Resources: 6 (4 static + 2 live)
-测试: Layer 1 TCP + Layer 2 MCP protocol
+执行阶段 A：启用 GAS/Enhanced Input 依赖，创建 ASC PlayerState、CharacterBase、PlayerCharacter、EnemyCharacter、PlayerController、GameMode 基线并编译验证。

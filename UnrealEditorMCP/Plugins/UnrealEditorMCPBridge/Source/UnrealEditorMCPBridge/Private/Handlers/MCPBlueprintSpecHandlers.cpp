@@ -9,6 +9,8 @@
 #include "EdGraphSchema_K2.h"
 #include "K2Node_Event.h"
 #include "K2Node_CallFunction.h"
+#include "K2Node_VariableGet.h"
+#include "K2Node_VariableSet.h"
 #include "UObject/SavePackage.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 
@@ -24,7 +26,7 @@ namespace MCPBlueprintSpecHelpers
 		TSharedPtr<FJsonObject> BPObj = MakeShareable(new FJsonObject());
 		BPObj->SetStringField(TEXT("name"), BlueprintName);
 		BPObj->SetStringField(TEXT("parent_class"), ParentClass);
-		BPObj->SetStringField(TEXT("path"), TEXT("/Game/Blueprints"));
+		BPObj->SetStringField(TEXT("path"), TEXT("/Game/MCPTest"));
 		Spec->SetObjectField(TEXT("blueprint"), BPObj);
 
 		TArray<TSharedPtr<FJsonValue>> GraphsArray;
@@ -108,6 +110,8 @@ namespace MCPBlueprintSpecHelpers
 				(*NodeObj)->TryGetStringField(TEXT("type"), NodeSpec.Type);
 				(*NodeObj)->TryGetStringField(TEXT("event_name"), NodeSpec.EventName);
 				(*NodeObj)->TryGetStringField(TEXT("function_name"), NodeSpec.FunctionName);
+				(*NodeObj)->TryGetStringField(TEXT("node_class"), NodeSpec.NodeClass);
+				(*NodeObj)->TryGetStringField(TEXT("var_name"), NodeSpec.VarName);
 
 				const TSharedPtr<FJsonObject>* ParamsObj = nullptr;
 				if ((*NodeObj)->TryGetObjectField(TEXT("params"), ParamsObj))
@@ -195,9 +199,35 @@ namespace MCPBlueprintSpecHelpers
 				NodeObj->SetStringField(TEXT("type"), TEXT("call_function"));
 				NodeObj->SetStringField(TEXT("function_name"), FuncName.ToString());
 			}
+			else if (UK2Node_VariableGet* VarGet = Cast<UK2Node_VariableGet>(Node))
+			{
+				FName VarName = VarGet->VariableReference.GetMemberName();
+				FString TypeKey = TEXT("var_get_") + VarName.ToString();
+				Idx = TypeIndex.FindOrAdd(TypeKey, 0);
+				TypeIndex[TypeKey] = Idx + 1;
+				NodeObj->SetStringField(TEXT("id"), FString::Printf(TEXT("%s_%d"), *TypeKey, Idx));
+				NodeObj->SetStringField(TEXT("type"), TEXT("variable_get"));
+				NodeObj->SetStringField(TEXT("var_name"), VarName.ToString());
+			}
+			else if (UK2Node_VariableSet* VarSet = Cast<UK2Node_VariableSet>(Node))
+			{
+				FName VarName = VarSet->VariableReference.GetMemberName();
+				FString TypeKey = TEXT("var_set_") + VarName.ToString();
+				Idx = TypeIndex.FindOrAdd(TypeKey, 0);
+				TypeIndex[TypeKey] = Idx + 1;
+				NodeObj->SetStringField(TEXT("id"), FString::Printf(TEXT("%s_%d"), *TypeKey, Idx));
+				NodeObj->SetStringField(TEXT("type"), TEXT("variable_set"));
+				NodeObj->SetStringField(TEXT("var_name"), VarName.ToString());
+			}
 			else
 			{
-				continue;
+				FString ClassName = Node->GetClass()->GetName();
+				FString TypeKey = TEXT("node_") + ClassName;
+				Idx = TypeIndex.FindOrAdd(TypeKey, 0);
+				TypeIndex[TypeKey] = Idx + 1;
+				NodeObj->SetStringField(TEXT("id"), FString::Printf(TEXT("%s_%d"), *TypeKey, Idx));
+				NodeObj->SetStringField(TEXT("type"), TEXT("node_by_class"));
+				NodeObj->SetStringField(TEXT("node_class"), ClassName);
 			}
 
 			NodeObj->SetStringField(TEXT("node_guid"), MCPBlueprintGraphHelpers::GuidToString(Node->NodeGuid));
@@ -286,7 +316,7 @@ bool FMCPApplyBlueprintSpecHandler::Execute(TSharedPtr<FJsonObject> Payload, TSh
 		return false;
 	}
 
-	FString PackagePath = TEXT("/Game/Blueprints");
+	FString PackagePath = TEXT("/Game/MCPTest");
 	const TSharedPtr<FJsonObject>* BpObj = nullptr;
 	if ((*SpecPtr)->TryGetObjectField(TEXT("blueprint"), BpObj))
 	{
@@ -380,10 +410,11 @@ bool FMCPApplyBlueprintSpecHandler::Execute(TSharedPtr<FJsonObject> Payload, TSh
 			UK2Node_CallFunction* CallNode = NewObject<UK2Node_CallFunction>(EventGraph);
 			CallNode->SetFromFunction(Function);
 			CallNode->CreateNewGuid();
-			CallNode->AllocateDefaultPins();
 			CallNode->NodePosX = 400;
 			CallNode->NodePosY = (CreatedNodes + 1) * 200;
 			EventGraph->AddNode(CallNode, false, false);
+			CallNode->PostPlacedNewNode();
+			CallNode->AllocateDefaultPins();
 
 			for (const auto& Param : NodeSpec.Params)
 			{
@@ -398,6 +429,55 @@ bool FMCPApplyBlueprintSpecHandler::Execute(TSharedPtr<FJsonObject> Payload, TSh
 			}
 
 			CreatedNode = CallNode;
+		}
+		else if (NodeSpec.Type == TEXT("node_by_class"))
+		{
+			if (NodeSpec.NodeClass.IsEmpty())
+			{
+				MCPBridgeHelpers::BuildErrorResponse(TEXT("MISSING_PARAM"), FString::Printf(TEXT("Node '%s': node_class required for node_by_class type"), *NodeSpec.Id), OutErrorCode, OutErrorMessage);
+				return false;
+			}
+
+			UClass* NodeClassPtr = nullptr;
+			if (!MCPBlueprintGraphHelpers::ValidateNodeClass(NodeSpec.NodeClass, NodeClassPtr, OutErrorCode, OutErrorMessage))
+			{
+				return false;
+			}
+
+			CreatedNode = MCPBlueprintGraphHelpers::CreateNodeByClass(EventGraph, NodeClassPtr, 400, (CreatedNodes + 1) * 200, OutErrorCode, OutErrorMessage);
+			if (!CreatedNode) return false;
+		}
+		else if (NodeSpec.Type == TEXT("variable_get") || NodeSpec.Type == TEXT("variable_set"))
+		{
+			if (NodeSpec.VarName.IsEmpty())
+			{
+				MCPBridgeHelpers::BuildErrorResponse(TEXT("MISSING_PARAM"), FString::Printf(TEXT("Node '%s': var_name required for %s type"), *NodeSpec.Id, *NodeSpec.Type), OutErrorCode, OutErrorMessage);
+				return false;
+			}
+
+			bool bVarExists = false;
+			for (const FBPVariableDescription& Var : BP->NewVariables)
+			{
+				if (Var.VarName.ToString() == NodeSpec.VarName) { bVarExists = true; break; }
+			}
+			if (!bVarExists)
+			{
+				MCPBridgeHelpers::BuildErrorResponse(TEXT("VARIABLE_NOT_FOUND"), FString::Printf(TEXT("Node '%s': variable '%s' not found"), *NodeSpec.Id, *NodeSpec.VarName), OutErrorCode, OutErrorMessage);
+				return false;
+			}
+
+			if (NodeSpec.Type == TEXT("variable_get"))
+			{
+				UK2Node_VariableGet* VG = MCPBlueprintGraphHelpers::CreateVariableGetNode(EventGraph, FName(*NodeSpec.VarName), BP, 400, (CreatedNodes + 1) * 200, OutErrorCode, OutErrorMessage);
+				if (!VG) return false;
+				CreatedNode = VG;
+			}
+			else
+			{
+				UK2Node_VariableSet* VS = MCPBlueprintGraphHelpers::CreateVariableSetNode(EventGraph, FName(*NodeSpec.VarName), BP, 400, (CreatedNodes + 1) * 200, OutErrorCode, OutErrorMessage);
+				if (!VS) return false;
+				CreatedNode = VS;
+			}
 		}
 		else
 		{

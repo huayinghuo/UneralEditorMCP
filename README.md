@@ -16,7 +16,7 @@ Unreal Engine 5.3 Editor
 
 **传输层可替换**，当前使用本地 TCP + 外部 Python Server，后续可评估 HTTP/SSE。
 
-## 能力清单（58 Handler）
+## 能力清单（87 Handler）
 
 ### 编辑器状态（7）
 | 工具 | 说明 |
@@ -73,17 +73,58 @@ Unreal Engine 5.3 Editor
 | `ue_material_set_vector_param` | 设置 MaterialInstance 向量/颜色参数 |
 | `ue_material_set_texture_param` | 设置 MaterialInstance 纹理参数 |
 
-### Blueprint 图编辑（8）
+### Blueprint 图编辑（15）
 | 工具 | 说明 |
 |------|------|
 | `ue_blueprint_create_actor_class` | 创建 Actor Blueprint 类 |
 | `ue_blueprint_get_event_graph_info` | 获取 EventGraph 结构信息 |
 | `ue_blueprint_add_event_node` | 添加/复用事件节点 |
 | `ue_blueprint_add_call_function_node` | 添加 CallFunction 节点 |
+| `ue_blueprint_add_node_by_class` | 通用 K2Node 工厂（Branch/Sequence/Comparison 等） |
+| `ue_blueprint_add_variable_node` | 创建变量 Get/Set 节点 |
+| `ue_blueprint_set_pin_default` | 设置输入引脚默认值 |
+| `ue_blueprint_get_function_signature` | 获取函数参数签名 |
 | `ue_blueprint_connect_pins` | 连接引脚 |
+| `ue_blueprint_disconnect_pins` | 断开引脚连接 |
+| `ue_blueprint_remove_node` | 删除图节点 |
+| `ue_blueprint_remove_variable` | 删除成员变量 |
 | `ue_blueprint_compile_save` | 编译 Blueprint（可选保存） |
-| `ue_blueprint_apply_spec` | 从声明式 spec JSON 创建 BP 图 |
+| `ue_blueprint_apply_spec` | 从声明式 spec JSON 创建 BP 图（含 node_by_class / variable_get/set） |
 | `ue_blueprint_export_spec` | 导出已有 BP 的 EventGraph 为 spec |
+
+### Enhanced Input（14）
+| 工具 | 说明 |
+|------|------|
+| `ue_search_input_actions` | 搜索 InputAction 资产 |
+| `ue_create_input_action` | 创建 InputAction（bool/float/vector2d/vector3d） |
+| `ue_get_input_action_info` | 获取 InputAction 详情（类型/路径） |
+| `ue_delete_input_action` | 删除 InputAction |
+| `ue_search_input_mapping_contexts` | 搜索 InputMappingContext 资产 |
+| `ue_create_input_mapping_context` | 创建 InputMappingContext |
+| `ue_get_input_mapping_context_info` | 获取 IMC 详情 + 映射列表 |
+| `ue_delete_input_mapping_context` | 删除 InputMappingContext |
+| `ue_add_input_mapping` | 向 IMC 添加键映射（InputAction+Key） |
+| `ue_remove_input_mapping` | 从 IMC 删除映射（按 index 或 key） |
+| `ue_set_input_mapping_action` | 修改现有映射的 InputAction |
+| `ue_set_input_mapping_key` | 修改现有映射的按键 |
+| `ue_blueprint_add_enhanced_input_node` | 向 BP EventGraph 添加输入动作事件节点 |
+| `ue_blueprint_add_imc_node` | 向 BP 添加映射上下文节点 |
+
+### Blueprint Utility（3）
+| 工具 | 说明 |
+|------|------|
+| `ue_blueprint_search_functions` | 按关键字搜索 BlueprintCallable 函数 |
+| `ue_blueprint_set_variable_default` | 设置 BP 变量 CDO 默认值 |
+| `ue_blueprint_set_component_default` | 设置 BP 组件属性默认值 |
+
+### PIE 运行时（5）
+| 工具 | 说明 |
+|------|------|
+| `ue_pie_start` | 启动 Play In Editor 会话 |
+| `ue_pie_stop` | 停止 PIE 会话 |
+| `ue_pie_is_running` | 查询 PIE 是否运行中 |
+| `ue_get_actor_state` | 获取 PIE 中 Actor 位置/旋转/速度 |
+| `ue_set_level_default_pawn` | 设置关卡默认 Pawn 类 |
 
 ### Widget 深化编辑（10）
 | 工具 | 说明 |
@@ -139,7 +180,7 @@ UnrealEditorMCP/                    ← Git 仓库根目录
 │   │   ├── Config/                      # ini 配置（Token/Port）
 │   │   ├── Source/UnrealEditorMCPBridge/
 │   │   │   ├── Public/                  # Handler 接口、调度器、Helpers
-│   │   │   │   └── Handlers/            # 11 个领域文件（58 Handler）
+│   │   │   │   └── Handlers/            # 15 个领域文件（87 Handler）
 │   │   │   └── Private/                 # 实现
 │   │   └── Resources/
 │   ├── Tools/MCPBridgeServer/           # Python MCP Server
@@ -147,12 +188,14 @@ UnrealEditorMCP/                    ← Git 仓库根目录
 │   │   │   ├── server.py                # MCP 入口
 │   │   │   ├── bridge_client.py         # TCP 客户端
 │   │   │   ├── resources.py             # MCP Resources 知识层（4 static + 2 live）
-│   │   │   └── tool_schemas.py          # 58 tool schema 注册表
+│   │   │   └── tool_schemas.py          # 87 tool schema 注册表
 │   │   └── tests/
 │   │       ├── test_stage12a.ps1          # 传输层稳态化验收
 │   │       ├── test_stage14_resources.ps1 # 资源层验收（双模）
 │   │       ├── test_resources_mcp.py      # MCP 协议层精确测试
-│   │       └── test_stage16_widget_deep.ps1 # Widget 深化验收
+│   │       ├── test_stage16_widget_deep.ps1 # Widget 深化验收
+│   │       ├── test_stage17.ps1             # Blueprint Advanced 验收
+│   │       └── test_stage18_playermove.ps1   # EI+PIE 端到端验收
 │   └── .ai/                             # 项目治理（plan / log / dev）
 └── Config/                              # 项目工程配置
 ```
@@ -222,8 +265,8 @@ Port=9876
 ## 权限模型
 
 ```
-Read (26)：ping / status / *_info / list_* / get_* / viewport_screenshot / dirty_packages / widget_*_schema / widget_find
-Write (31)：spawn / set_* / delete / save / create_* / transaction / material_set_* / blueprint_add_* / widget_*
+Read (32)：ping / status / *_info / list_* / get_* / viewport_screenshot / dirty_packages / widget_*_schema / widget_find / search_*
+Write (54)：spawn / set_* / delete / save / create_* / transaction / material_set_* / blueprint_* / widget_* / pie_* / input_*
 Dangerous (1)：execute_python_snippet
 ```
 

@@ -162,7 +162,7 @@ bool FMCPCreateWidgetBlueprintHandler::Execute(TSharedPtr<FJsonObject> Payload, 
 		return false;
 	}
 
-	FString PackagePath = TEXT("/Game/UI");
+	FString PackagePath = TEXT("/Game/MCPTest");
 	if (Payload.IsValid()) Payload->TryGetStringField(TEXT("path"), PackagePath);
 
 	FString PackageName = PackagePath / WidgetName;

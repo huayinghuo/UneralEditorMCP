@@ -151,7 +151,7 @@ bool FMCPCreateBlueprintHandler::Execute(TSharedPtr<FJsonObject> Payload, TShare
 	}
 
 	// 确定包路径
-	FString PackagePath = TEXT("/Game/Blueprints");
+	FString PackagePath = TEXT("/Game/MCPTest");
 	if (Payload.IsValid())
 	{
 		Payload->TryGetStringField(TEXT("path"), PackagePath);
@@ -235,7 +235,7 @@ bool FMCPAddBlueprintVariableHandler::Execute(TSharedPtr<FJsonObject> Payload, T
 	FEdGraphPinType PinType;
 	if (VarType == TEXT("bool"))       PinType.PinCategory = UEdGraphSchema_K2::PC_Boolean;
 	else if (VarType == TEXT("int"))   PinType.PinCategory = UEdGraphSchema_K2::PC_Int;
-	else if (VarType == TEXT("float")) PinType.PinCategory = UEdGraphSchema_K2::PC_Real;
+	else if (VarType == TEXT("float")) { PinType.PinCategory = UEdGraphSchema_K2::PC_Real; PinType.PinSubCategory = UEdGraphSchema_K2::PC_Float; }
 	else if (VarType == TEXT("string"))PinType.PinCategory = UEdGraphSchema_K2::PC_String;
 	else if (VarType == TEXT("Vector")){ PinType.PinCategory = UEdGraphSchema_K2::PC_Struct; PinType.PinSubCategoryObject = TBaseStructure<FVector>::Get(); }
 	else if (VarType == TEXT("Rotator")){ PinType.PinCategory = UEdGraphSchema_K2::PC_Struct; PinType.PinSubCategoryObject = TBaseStructure<FRotator>::Get(); }

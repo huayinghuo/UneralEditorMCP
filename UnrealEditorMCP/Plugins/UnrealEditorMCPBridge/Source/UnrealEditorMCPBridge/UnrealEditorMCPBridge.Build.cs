@@ -30,7 +30,9 @@ public class UnrealEditorMCPBridge : ModuleRules
 			"BlueprintGraph",
 			"UMG",
 			"UMGEditor",
-			"MaterialEditor"
+			"MaterialEditor",
+			"EnhancedInput",
+			"InputCore"
 		});
 	}
 }
