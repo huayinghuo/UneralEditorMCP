@@ -10,6 +10,7 @@
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "EdGraph/EdGraph.h"
 #include "K2Node_CallFunction.h"
+#include "HAL/FileManager.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogMCPEI, Log, All);
 
@@ -73,15 +74,17 @@ bool FMCPCreateInputActionHandler::Execute(TSharedPtr<FJsonObject> Payload, TSha
 {
 	FString N,P=TEXT("/Game/MCPTest");if(!Payload.IsValid()||!Payload->TryGetStringField(TEXT("name"),N)){MCPBridgeHelpers::BuildErrorResponse(TEXT("MISSING_PARAM"),TEXT("name required"),OutErrorCode,OutErrorMessage);return false;}if(Payload.IsValid())Payload->TryGetStringField(TEXT("path"),P);
 	FString PackageName = P / N;
-	static TSet<FString> Created;
-	if (Created.Contains(PackageName)) { MCPBridgeHelpers::BuildErrorResponse(TEXT("ASSET_CONFLICT"), FString::Printf(TEXT("'%s' already exists (in-session duplicate)"), *N), OutErrorCode, OutErrorMessage); return false; }
-	// 四重检查：内存 + UE 包系统 + 纯文件系统（防 CreatePackage 内核层弹窗）
-	FString UEFilePath = FPackageName::LongPackageNameToFilename(PackageName, FPackageName::GetAssetPackageExtension());
-	if (FindPackage(nullptr, *PackageName) || LoadPackage(nullptr, *PackageName, LOAD_NoWarn|LOAD_Quiet)
-		|| FPaths::FileExists(UEFilePath) || IFileManager::Get().FileExists(*UEFilePath))
+	// AssetRegistry 查重（与 create_blueprint 一致）
+	FString ObjectPath = PackageName + TEXT(".") + N;
+	FAssetRegistryModule& ARMod = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry"));
+	if (ARMod.Get().GetAssetByObjectPath(FSoftObjectPath(ObjectPath)).IsValid())
 	{ MCPBridgeHelpers::BuildErrorResponse(TEXT("ASSET_CONFLICT"), FString::Printf(TEXT("'%s' already exists"), *N), OutErrorCode, OutErrorMessage); return false; }
+	if (FindPackage(nullptr, *PackageName))
+	{ MCPBridgeHelpers::BuildErrorResponse(TEXT("ASSET_CONFLICT"), FString::Printf(TEXT("'%s' already exists"), *N), OutErrorCode, OutErrorMessage); return false; }
+	// 磁盘文件检查（防止未加载的 .uasset 引发 CreatePackage 冲突弹窗）
+	if (IFileManager::Get().FileExists(*(P / N + TEXT(".uasset"))))
+	{ MCPBridgeHelpers::BuildErrorResponse(TEXT("ASSET_CONFLICT"), FString::Printf(TEXT("'%s' already exists on disk"), *N), OutErrorCode, OutErrorMessage); return false; }
 	UPackage* Pkg = CreatePackage(*PackageName); if(!Pkg){MCPBridgeHelpers::BuildErrorResponse(TEXT("CREATE_FAILED"),TEXT("CreatePackage failed"),OutErrorCode,OutErrorMessage);return false;}
-	Created.Add(PackageName);
 	FString VT=TEXT("bool");if(Payload.IsValid())Payload->TryGetStringField(TEXT("value_type"),VT);
 	UInputAction* IA = NewObject<UInputAction>(Pkg, *N, RF_Public|RF_Standalone); if(!IA){MCPBridgeHelpers::BuildErrorResponse(TEXT("CREATE_FAILED"),TEXT("NewObject failed"),OutErrorCode,OutErrorMessage);return false;}
 	FAssetRegistryModule::AssetCreated(IA); Pkg->MarkPackageDirty();
@@ -106,13 +109,14 @@ bool FMCPCreateIMCHandler::Execute(TSharedPtr<FJsonObject> Payload, TSharedPtr<F
 {
 	FString N,P=TEXT("/Game/MCPTest");if(!Payload.IsValid()||!Payload->TryGetStringField(TEXT("name"),N)){MCPBridgeHelpers::BuildErrorResponse(TEXT("MISSING_PARAM"),TEXT("name required"),OutErrorCode,OutErrorMessage);return false;}if(Payload.IsValid())Payload->TryGetStringField(TEXT("path"),P);
 	FString PackageName = P / N;
-	static TSet<FString> Created;
-	if (Created.Contains(PackageName)) { MCPBridgeHelpers::BuildErrorResponse(TEXT("ASSET_CONFLICT"), FString::Printf(TEXT("'%s' already exists (in-session)"), *N), OutErrorCode, OutErrorMessage); return false; }
-	FString UEFP = FPackageName::LongPackageNameToFilename(PackageName, FPackageName::GetAssetPackageExtension());
-	if (FindPackage(nullptr, *PackageName) || FPaths::FileExists(UEFP) || IFileManager::Get().FileExists(*UEFP))
+	FString ObjectPath = PackageName + TEXT(".") + N;
+	FAssetRegistryModule& ARMod = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry"));
+	if (ARMod.Get().GetAssetByObjectPath(FSoftObjectPath(ObjectPath)).IsValid() || FindPackage(nullptr, *PackageName))
 	{ MCPBridgeHelpers::BuildErrorResponse(TEXT("ASSET_CONFLICT"), FString::Printf(TEXT("'%s' already exists"), *N), OutErrorCode, OutErrorMessage); return false; }
+	// 磁盘文件检查（防止未加载的 .uasset 引发 CreatePackage 冲突弹窗）
+	if (IFileManager::Get().FileExists(*(P / N + TEXT(".uasset"))))
+	{ MCPBridgeHelpers::BuildErrorResponse(TEXT("ASSET_CONFLICT"), FString::Printf(TEXT("'%s' already exists on disk"), *N), OutErrorCode, OutErrorMessage); return false; }
 	UPackage* Pkg = CreatePackage(*PackageName); if(!Pkg){MCPBridgeHelpers::BuildErrorResponse(TEXT("CREATE_FAILED"),TEXT("CreatePackage failed"),OutErrorCode,OutErrorMessage);return false;}
-	Created.Add(PackageName);
 	UInputMappingContext* IMC = NewObject<UInputMappingContext>(Pkg, *N, RF_Public|RF_Standalone); if(!IMC){MCPBridgeHelpers::BuildErrorResponse(TEXT("CREATE_FAILED"),TEXT("NewObject failed"),OutErrorCode,OutErrorMessage);return false;}
 	FAssetRegistryModule::AssetCreated(IMC); Pkg->MarkPackageDirty();
 	OutResult=MakeShareable(new FJsonObject());BuildIMCJson(IMC,OutResult);return true;

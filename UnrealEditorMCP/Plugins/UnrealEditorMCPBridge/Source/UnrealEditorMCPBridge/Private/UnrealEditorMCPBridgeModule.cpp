@@ -54,6 +54,7 @@ void FUnrealEditorMCPBridgeModule::StartupModule()
 	BeginFrameHandle = FCoreDelegates::OnBeginFrame.AddRaw(
 		this, &FUnrealEditorMCPBridgeModule::OnBeginFrame
 	);
+
 }
 
 void FUnrealEditorMCPBridgeModule::ShutdownModule()

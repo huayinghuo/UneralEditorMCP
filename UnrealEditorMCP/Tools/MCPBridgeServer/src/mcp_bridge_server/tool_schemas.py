@@ -322,19 +322,6 @@ TOOL_SCHEMAS = {
         },
     },
     # ---- Blueprint Graph Editing (Stage 11A) ----
-    "blueprint_create_actor_class": {
-        "name": "ue_blueprint_create_actor_class",
-        "description": "Create a new Actor Blueprint class (parent must be Actor-derived)",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "name": {"type": "string", "description": "Blueprint name"},
-                "parent_class": {"type": "string", "description": "Parent class name (default: Actor)"},
-                "path": {"type": "string", "description": "Content path (default: /Game/Blueprints)"},
-            },
-            "required": ["name"],
-        },
-    },
     "blueprint_get_event_graph_info": {
         "name": "ue_blueprint_get_event_graph_info",
         "description": "Get EventGraph info: existence, event node count, BeginPlay node GUID",
@@ -701,7 +688,7 @@ TOOL_SCHEMAS = {
     "blueprint_add_cdo_array": {
         "name": "ue_blueprint_add_cdo_array",
         "description": "Add an element to a TArray property on a Blueprint's CDO",
-        "inputSchema": {"type":"object","properties":{"asset_path":{"type":"string"},"property_name":{"type":"string"},"value":{"type":"string","description":"Optional: struct value for the new element"}},"required":["asset_path","property_name"]},
+        "inputSchema": {"type":"object","properties":{"asset_path":{"type":"string"},"property_name":{"type":"string"},"value":{"type":"string","description":"Optional: struct value for the new element"},"field_overrides":{"type":"object","description":"Optional: {field_name: \"/Script/Module.ClassName:PropertyName\"} to restore FProperty*/UObject* pointers that ImportText cannot serialize"}},"required":["asset_path","property_name"]},
     },
     "blueprint_remove_cdo_array": {
         "name": "ue_blueprint_remove_cdo_array",
@@ -722,6 +709,12 @@ TOOL_SCHEMAS = {
         "name": "ue_search_gameplay_tags",
         "description": "Search GameplayTags by name substring",
         "inputSchema": {"type":"object","properties":{"search_term":{"type":"string"},"max_results":{"type":"number"}},"required":[]},
+    },
+    # ---- System Utility (Stage 20B) ----
+    "close_modal_window": {
+        "name": "ue_close_modal_window",
+        "description": "Dismiss the currently active UE Editor modal dialog. Use after receiving a TIMEOUT error to clear blocking prompts.",
+        "inputSchema": {"type":"object","properties":{},"required":[]},
     },
     # ---- Material ----
     "list_materials": {

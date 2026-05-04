@@ -16,7 +16,7 @@ Unreal Engine 5.3 Editor
 
 **传输层可替换**，当前使用本地 TCP + 外部 Python Server，后续可评估 HTTP/SSE。
 
-## 能力清单（87 Handler）
+## 能力清单（96 Handler）
 
 ### 编辑器状态（7）
 | 工具 | 说明 |
@@ -117,6 +117,26 @@ Unreal Engine 5.3 Editor
 | `ue_blueprint_set_variable_default` | 设置 BP 变量 CDO 默认值 |
 | `ue_blueprint_set_component_default` | 设置 BP 组件属性默认值 |
 
+### Blueprint CDO 属性（4）
+| 工具 | 说明 |
+|------|------|
+| `ue_blueprint_get_cdo_property` | 读取蓝图 CDO 属性（标量/数组/结构体） |
+| `ue_blueprint_set_cdo_property` | 写入蓝图 CDO 属性 |
+| `ue_blueprint_add_cdo_array` | 向 CDO TArray<FStruct> 追加元素（支持 field_overrides 修复 FProperty*/UObject* 指针） |
+| `ue_blueprint_remove_cdo_array` | 从 CDO 数组删除元素 |
+
+### GameplayTag（3）
+| 工具 | 说明 |
+|------|------|
+| `ue_create_gameplay_tag` | 创建 GameplayTag（持久化到 DefaultGameplayTags.ini） |
+| `ue_list_gameplay_tags` | 列出已注册 GameplayTag |
+| `ue_search_gameplay_tags` | 按关键词搜索 GameplayTag |
+
+### 系统工具（1）
+| 工具 | 说明 |
+|------|------|
+| `ue_close_modal_window` | 关闭 UE Editor 当前活跃的模态弹窗，避免阻塞 MCP 请求 |
+
 ### PIE 运行时（5）
 | 工具 | 说明 |
 |------|------|
@@ -180,7 +200,7 @@ UnrealEditorMCP/                    ← Git 仓库根目录
 │   │   ├── Config/                      # ini 配置（Token/Port）
 │   │   ├── Source/UnrealEditorMCPBridge/
 │   │   │   ├── Public/                  # Handler 接口、调度器、Helpers
-│   │   │   │   └── Handlers/            # 15 个领域文件（87 Handler）
+│   │   │   │   └── Handlers/            # 18 个领域文件（98 Handler）
 │   │   │   └── Private/                 # 实现
 │   │   └── Resources/
 │   ├── Tools/MCPBridgeServer/           # Python MCP Server
@@ -188,7 +208,7 @@ UnrealEditorMCP/                    ← Git 仓库根目录
 │   │   │   ├── server.py                # MCP 入口
 │   │   │   ├── bridge_client.py         # TCP 客户端
 │   │   │   ├── resources.py             # MCP Resources 知识层（4 static + 2 live）
-│   │   │   └── tool_schemas.py          # 87 tool schema 注册表
+│   │   │   └── tool_schemas.py          # 98 tool schema 注册表
 │   │   └── tests/
 │   │       ├── test_stage12a.ps1          # 传输层稳态化验收
 │   │       ├── test_stage14_resources.ps1 # 资源层验收（双模）
@@ -266,8 +286,8 @@ Port=9876
 ## 权限模型
 
 ```
-Read (32)：ping / status / *_info / list_* / get_* / viewport_screenshot / dirty_packages / widget_*_schema / widget_find / search_*
-Write (54)：spawn / set_* / delete / save / create_* / transaction / material_set_* / blueprint_* / widget_* / pie_* / input_*
+Read (35)：ping / status / *_info / list_* / get_* / viewport_screenshot / dirty_packages / widget_*_schema / widget_find / search_*
+Write (62)：spawn / set_* / delete / save / create_* / transaction / material_set_* / blueprint_* / widget_* / pie_* / input_* / cdo_* / close_modal_window
 Dangerous (1)：execute_python_snippet
 ```
 
@@ -278,8 +298,11 @@ Dangerous (1)：execute_python_snippet
 - 仅本地回环（127.0.0.1），不支持远程访问
 - 单客户端独占 TCP 连接模式（第二连接被拒绝并返回 CLIENT_ALREADY_CONNECTED 错误）
 - 运行时诊断：支持 `ue_get_bridge_runtime_status` + `ue_get_mcp_config` + `ue://runtime/*` Resources
-- Blueprint：支持变量/函数添加 + 组件添加 + 节点级图编辑 + 声明式 spec 重建
-- Widget：完整 UMG Designer 闭环（创建/查询/schema/树编辑/slot/属性/wrap/duplicate）
+- Blueprint：支持变量/函数添加 + 组件添加 + 节点级图编辑 + 声明式 spec 重建 + CDO 属性编辑
+- Widget：完整 UMG Designer 闭环
+- Enhanced Input：完整资产创建/按键映射/BP 事件节点
+- GameplayTag：创建（持久化 ini）/搜索/列举
+- 模态弹窗处理：支持 `ue_close_modal_window` 主动关闭阻断弹窗
 - Python 协议桥：线程安全（UEBridgeClient.send 实例级 Lock 串行化）
 - 不包含 Sequencer / Niagara / Animation 操作
 

@@ -137,18 +137,21 @@ bool FMCPCreateBlueprintHandler::Execute(TSharedPtr<FJsonObject> Payload, TShare
 		Payload->TryGetStringField(TEXT("parent_class"), ParentClassName);
 	}
 
-	// 查找父类 UClass（优先精确，再补 A 前缀）
+	// 查找父类 UClass（遍历常见前缀：A→Actor, U→Object）
 	UClass* ParentClass = FindFirstObject<UClass>(*ParentClassName, EFindFirstObjectOptions::None, ELogVerbosity::NoLogging);
 	if (!ParentClass)
 	{
-		FString WithPrefix = TEXT("A") + ParentClassName;
-		ParentClass = FindFirstObject<UClass>(*WithPrefix, EFindFirstObjectOptions::None, ELogVerbosity::NoLogging);
+		for (const TCHAR* Prefix : { TEXT("A"), TEXT("U"), TEXT("") })
+		{
+			FString Prefixed = FString(Prefix) + ParentClassName;
+			ParentClass = FindFirstObject<UClass>(*Prefixed, EFindFirstObjectOptions::None, ELogVerbosity::NoLogging);
+			if (ParentClass) break;
+		}
 	}
-	if (!ParentClass || !ParentClass->IsChildOf(AActor::StaticClass()))
-	{
-		MCPBridgeHelpers::BuildErrorResponse(TEXT("CLASS_NOT_FOUND"), FString::Printf(TEXT("Parent class '%s' not found or not an Actor subclass"), *ParentClassName), OutErrorCode, OutErrorMessage);
-		return false;
-	}
+	if (!ParentClass || !ParentClass->IsChildOf(UObject::StaticClass()))
+	{ MCPBridgeHelpers::BuildErrorResponse(TEXT("CLASS_NOT_FOUND"), FString::Printf(TEXT("Parent class '%s' not found"), *ParentClassName), OutErrorCode, OutErrorMessage); return false; }
+	if (ParentClass->HasMetaData(TEXT("NotBlueprintable")))
+	{ MCPBridgeHelpers::BuildErrorResponse(TEXT("CLASS_NOT_FOUND"), FString::Printf(TEXT("Parent class '%s' is marked NotBlueprintable"), *ParentClassName), OutErrorCode, OutErrorMessage); return false; }
 
 	// 确定包路径
 	FString PackagePath = TEXT("/Game/MCPTest");

@@ -1,14 +1,14 @@
 # Unreal Editor MCP Bridge — 协作计划摘要
 
-> 外部权威主计划：`C:\Users\萤火\.local\share\kilo\plans\1777390210726-swift-squid.md`
+> 外部权威主计划：`.kilo/plans/1777390210726-swift-squid.md`
 > 本文件为主计划的精简协作镜像，仅供远端子仓库/新机器/新 worktree 与其它 agent 获取共享上下文。
 > 同步规则：**外部主计划先更新，本文件在阶段切换或关键决策变化时单向同步。**
 
 ---
 
-## 当前阶段（2026-04-30）
+## 当前阶段（2026-05-04）
 
-**当前主线：阶段 16 已完成** — Widget 完整深化（58 Handler，28/28 通过）
+**当前主线：阶段 19 — Bug 修复与契约收敛**（进行中，94→96 Handler）
 
 ### 已完成里程碑
 
@@ -33,14 +33,31 @@
 | 14A Resources 契约统一 + 测试分层 | ✅ |
 | 15A BridgeClient 并发串行化 + 镜像收口 | ✅ |
 | 16 Widget 能力完整深化（50→58 Handler） | ✅ |
+| 17 Blueprint 图编辑对齐参考项目（58→65 Handler） | ✅ |
+| 18A 函数搜索 + CDO 默认值（65→68 Handler） | ✅ |
+| 18B PIE 运行时控制（68→73 Handler） | ✅ |
+| 18C Enhanced Input 完整栈（73→87 Handler） | ✅ |
+| 19 Bug 修复（87→96 Handler） | ✅ |
+
+### 19 关键变更
+
+- **create_blueprint 前缀循环修复**（A/U/空三轮）
+- **blueprint_create_actor_class 删除**（与 create_blueprint 合并）
+- **close_modal_window 实现**
+- **CDO 数组读写**：`blueprint_add/remove_cdo_array` + `field_overrides` 后处理（修复 FProperty*/UObject* 指针）
+- **GameplayTag 完整支持**：创建持久化 + 列表/搜索使用 Manager API + `EditorRefreshGameplayTagTree` 即时生效
+- **create_gameplay_tag 修复**：`TryUpdateDefaultConfigFile` 持久化 + `EditorRefreshGameplayTagTree` 即时生效
+- **Enhanced Input 冲突检测增强**：追加磁盘文件检查，防止未加载资产冲突弹窗
+- **README / schema 契约收敛**：工具名、参数、Handler 数同步
 
 ### 当前不在做的
 
 - 不切换 HTTP/SSE/WebSocket 传输协议
-- 不实现 UE 侧真正多客户端并发会话池（已固定为单客户端独占模型）
-- 不做远程部署、TLS、LAN 暴露
-- 不做 Widget Animation 时间轴/关键帧编辑
-- 不为所有 AI 客户端各写一套 skill（已拒绝，改为 P2 Resources 方案）
+- 不做 Legacy Input（仅 Enhanced Input）
+- 不自动化按键/鼠标输入模拟
+- 不做网络多人 PIE / Dedicated Server PIE
+- 不做 Widget Animation / Sequencer / Niagara 运行时
+- 不为所有 AI 客户端各写一套 skill
 
 ### 12A 关键变更
 
@@ -77,7 +94,7 @@ Unreal Engine 5.3 Editor
 
 ---
 
-## 能力清单（58 Handler）
+## 能力清单（96 Handler）
 
 | 类别 | 数量 | 工具 |
 |------|------|------|
@@ -87,10 +104,13 @@ Unreal Engine 5.3 Editor
 | 编辑操作 | 5 | set_transform, set_actor_property, set_component_property, save_level, viewport_screenshot |
 | 资产编辑 | 10 | create_blueprint, add_variable, add_function, add_component, create_widget_bp, widget_add/remove/set_property, material_set_scalar/vector/texture |
 | Widget 深化 | 10 | widget_get_property_schema, widget_get_slot_schema, widget_find, widget_set_root, widget_reparent, widget_reorder_child, widget_rename, widget_set_slot_property, widget_duplicate, widget_wrap_with_panel |
-| Blueprint 图编辑 | 8 | create_actor_class, event_graph_info, add_event_node, add_call_function_node, connect_pins, compile_save, apply_spec, export_spec |
+| Blueprint 图编辑 | 16 | event_graph_info, add_event_node, add_call_function_node, add_node_by_class, add_variable_node, connect_pins, disconnect_pins, remove_node, remove_variable, set_pin_default, get_function_signature, compile_save, apply_spec, export_spec, search_functions, set_variable_default, set_component_default |
+| Blueprint CDO | 4 | get_cdo_property, set_cdo_property, add_cdo_array, remove_cdo_array |
+| GameplayTag | 3 | create_gameplay_tag, list_gameplay_tags, search_gameplay_tags |
+| 系统工具 | 1 | close_modal_window |
+| Enhanced Input | 14 | search_input_actions, create_input_action, get_input_action_info, delete_input_action, search_imc, create_imc, get_imc_info, delete_imc, add_mapping, remove_mapping, set_mapping_action, set_mapping_key, bp_ei_action, bp_imc_node |
+| PIE 运行时 | 5 | pie_start, pie_stop, pie_is_running, get_actor_state, set_level_default_pawn |
 | 事务控制 | 4 | begin/end/undo/redo |
-| Blueprint 信息 | 1 | get_blueprint_info |
-| Material 信息 | 1 | get_material_info |
 | Python | 1 | execute_python_snippet (Dangerous) |
 
 ---
@@ -121,19 +141,18 @@ UnrealEditorMCP/                          ← Git 仓库根
 │   │       │   ├── MCPBridgeDispatcher.h
 │   │       │   ├── MCPBridgeHelpers.h
 │   │       │   ├── MCPBlueprintGraphHelpers.h
-│   │       │   ├── MCPBlueprintSpecTypes.h
-│   │       │   └── Handlers/             # 13 个 Handler 头文件
+│   │       │   └── Handlers/             # Handler 头文件
 │   │       └── Private/
 │   │           ├── MCPBridgeServer.cpp    # Server + Handler 注册
 │   │           ├── MCPBlueprintGraphHelpers.cpp
-│   │           └── Handlers/             # 13 个 Handler 实现
+│   │           └── Handlers/             # Handler 实现
 │   │
 │   └── Tools/MCPBridgeServer/
 │       ├── pyproject.toml
 │       └── src/mcp_bridge_server/
 │           ├── server.py                 # MCP 入口 + bootstrap fallback
 │           ├── bridge_client.py          # TCP 客户端
-│           └── tool_schemas.py           # 58 tool schema 注册表
+│           └── tool_schemas.py           # 96 tool schema 注册表
 ```
 
 ---

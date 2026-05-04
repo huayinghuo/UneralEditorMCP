@@ -34,8 +34,10 @@
 [2026-05-01] 阶段 17 验收修复：apply_spec dispatch 补齐 3 节点类型 + README 同步 + test_stage17.ps1 创建（9/9 测试通过）
 [2026-05-01] 阶段 18A：函数搜索+CDO默认值（3 Handler, 65→68, 编译通过）
 [2026-05-01] 阶段 18B：PIE 运行时控制（5 Handler, 68→73, 编译通过）
-[2026-05-02] 阶段 19：父类放宽 + CDO 通用属性 + GameplayTag + Python 输出（87→94 Handler，编译通过）
+[2026-05-04] 阶段 19 Bug 修复：create_blueprint 截断 + GameplayTag ini 持久化 + 删除冗余 create_actor_class（94 Handler）
 [2026-05-02] 20A：EI 资产创建防弹窗（三重检查 + static TSet）+ 超时警告机制（Server 线程 5s→TIMEOUT）
 [2026-05-01] GAS 文档分工：`GASPlan/gas-game-plan.md` 写游戏项目计划，`.kilo/gas/gas-game-plan.md` 写 MCP 需求项
 [2026-05-01] 阶段 A 完成：GAS 项目基线（.uproject 插件 + Build.cs 模块 + 6 类 12 文件 + 编译通过，20 actions 0 errors）
 [2026-05-01] 阶段 B MCP 能力边界实测：GE 蓝图创建 + DurationPolicy ✓，Modifier/Tag/SetByCaller ✗→ 5 条 MCP 需求追加
+[2026-05-04] 阶段 B MCP Round 2：CDO edit + GameplayTag 修复后全链路测试 — GE_Hero_AttributeInit (10 Modifier) + GE_Damage_Test (SetByCaller) + Data.Damage Tag 全部通过 MCP 创建/配置
+[2026-05-04] 阶段 19 修复：blueprint_add_cdo_array field_overrides FFieldPathProperty 赋值 + create_gameplay_tag 持久化/即时生效（94 Handler）

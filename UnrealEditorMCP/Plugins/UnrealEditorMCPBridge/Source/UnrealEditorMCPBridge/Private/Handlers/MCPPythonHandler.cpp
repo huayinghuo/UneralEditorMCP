@@ -31,18 +31,3 @@ bool FMCPExecutePythonHandler::Execute(TSharedPtr<FJsonObject> Payload, TSharedP
 	{ MCPBridgeHelpers::BuildErrorResponse(TEXT("PYTHON_EXEC_FAILED"), TEXT("Python execution failed"), OutErrorCode, OutErrorMessage); return false; }
 	return true;
 }
-
-	IPythonScriptPlugin* PythonPlugin = IPythonScriptPlugin::Get();
-	if (!PythonPlugin)
-	{
-		MCPBridgeHelpers::BuildErrorResponse(TEXT("PYTHON_UNAVAILABLE"), TEXT("PythonScriptPlugin is not available. Ensure Python Editor Script Plugin is enabled."), OutErrorCode, OutErrorMessage);
-		return false;
-	}
-
-	bool bSuccess = PythonPlugin->ExecPythonCommand(*PythonCode);
-
-	OutResult = MakeShareable(new FJsonObject());
-	OutResult->SetBoolField(TEXT("success"), bSuccess);
-	OutResult->SetStringField(TEXT("output"), TEXT(""));
-	return true;
-}

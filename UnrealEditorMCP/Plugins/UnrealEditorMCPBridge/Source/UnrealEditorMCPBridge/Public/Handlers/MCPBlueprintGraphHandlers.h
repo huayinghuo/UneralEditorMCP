@@ -4,14 +4,6 @@
 #include "Dom/JsonObject.h"
 #include "MCPBridgeHandler.h"
 
-class FMCPCreateActorBlueprintClassHandler : public IMCPBridgeHandler
-{
-public:
-	virtual FString GetActionName() const override { return TEXT("blueprint_create_actor_class"); }
-	virtual EMCPActionCategory GetCategory() const override { return EMCPActionCategory::Write; }
-	virtual bool Execute(TSharedPtr<FJsonObject> Payload, TSharedPtr<FJsonObject>& OutResult, FString& OutErrorCode, FString& OutErrorMessage) override;
-};
-
 class FMCPGetBlueprintEventGraphInfoHandler : public IMCPBridgeHandler
 {
 public:

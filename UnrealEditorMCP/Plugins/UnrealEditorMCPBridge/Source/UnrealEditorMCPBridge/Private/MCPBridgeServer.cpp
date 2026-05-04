@@ -13,6 +13,7 @@
 #include "Handlers/MCPBlueprintSpecHandlers.h"
 #include "Handlers/MCPBlueprintAdvancedHandlers.h"
 #include "Handlers/MCPBlueprintUtilityHandlers.h"
+#include "Handlers/MCPSystemHandlers.h"
 #include "Handlers/MCPPIERuntimeHandlers.h"
 #include "Handlers/MCPEnhancedInputHandlers.h"
 #include "Handlers/MCPGameplayTagHandlers.h"
@@ -53,6 +54,8 @@ void FMCPBridgeServer::RegisterHandlers()
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPGetAssetInfoHandler()));
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPGetMCPConfigHandler(this)));
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPGetBridgeRuntimeStatusHandler(this)));
+	// System（1 个）
+	Dispatcher.RegisterHandler(MakeShareable(new FMCPCloseModalWindowHandler()));
 	// Actor 类（4 个）
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPGetSelectedActorsHandler()));
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPListLevelActorsHandler()));
@@ -79,8 +82,7 @@ void FMCPBridgeServer::RegisterHandlers()
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPAddBlueprintVariableHandler()));
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPAddBlueprintFunctionHandler()));
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPBlueprintAddComponentHandler()));
-	// Blueprint Graph 编辑（6 个）
-	Dispatcher.RegisterHandler(MakeShareable(new FMCPCreateActorBlueprintClassHandler()));
+	// Blueprint Graph 编辑（5 个）
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPGetBlueprintEventGraphInfoHandler()));
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPBlueprintAddEventNodeHandler()));
 	Dispatcher.RegisterHandler(MakeShareable(new FMCPBlueprintAddCallFunctionNodeHandler()));

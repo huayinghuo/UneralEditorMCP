@@ -245,6 +245,7 @@ bool FMCPBlueprintSetCDOPropertyHandler::Execute(TSharedPtr<FJsonObject> Payload
 
 bool FMCPBlueprintAddCDOArrayHandler::Execute(TSharedPtr<FJsonObject> Payload, TSharedPtr<FJsonObject>& OutResult, FString& OutErrorCode, FString& OutErrorMessage)
 {
+	UE_LOG(LogMCPBPUtil, Warning, TEXT("AddCDOArray ENTERED"));
 	FString AssetPath, PropertyName, Value;
 	if (!Payload.IsValid() || !Payload->TryGetStringField(TEXT("asset_path"), AssetPath) || !Payload->TryGetStringField(TEXT("property_name"), PropertyName))
 	{ MCPBridgeHelpers::BuildErrorResponse(TEXT("MISSING_PARAM"), TEXT("asset_path and property_name required"), OutErrorCode, OutErrorMessage); return false; }
@@ -257,6 +258,60 @@ bool FMCPBlueprintAddCDOArrayHandler::Execute(TSharedPtr<FJsonObject> Payload, T
 	void* ArrAddr = ArrProp->ContainerPtrToValuePtr<void>(CDO); FScriptArrayHelper Helper(ArrProp, ArrAddr);
 	BP->Modify(); int32 NewIdx = Helper.AddValue();
 	if (!Value.IsEmpty()) { FProperty* Inner = ArrProp->Inner; void* Elem = Helper.GetRawPtr(NewIdx); Inner->ImportText_Direct(*Value, Elem, CDO, PPF_None); }
+	// 通用 field_overrides 后处理：ImportText 无法还原 struct 内 FProperty*/UObject* 指针，通过此参数补写
+	const TSharedPtr<FJsonObject>* OverridesPtr = nullptr;
+	UE_LOG(LogMCPBPUtil, Warning, TEXT("field_override: Payload.IsValid=%d field_overrides_exists=%d"), Payload.IsValid(), Payload.IsValid() && Payload->HasField(TEXT("field_overrides")));
+	if (Payload.IsValid() && Payload->TryGetObjectField(TEXT("field_overrides"), OverridesPtr) && OverridesPtr->IsValid())
+	{
+		void* Elem = Helper.GetRawPtr(NewIdx);
+		for (const auto& Override : (*OverridesPtr)->Values)
+		{
+			// 按 ":" 分割 value → ClassPath : PropertyName
+			FString FullPath; Override.Value->TryGetString(FullPath);
+			int32 ColonPos = INDEX_NONE;
+			if (!FullPath.FindLastChar(TEXT(':'), ColonPos)) continue;
+			FString ClassPath = FullPath.Left(ColonPos);
+			FString PropName = FullPath.RightChop(ColonPos + 1);
+		// 通过 UClass→FindPropertyByName 定位目标 FProperty*
+		UClass* RefClass = FindFirstObject<UClass>(*ClassPath, EFindFirstObjectOptions::None, ELogVerbosity::NoLogging);
+		FProperty* RefProp = RefClass ? RefClass->FindPropertyByName(FName(*PropName)) : nullptr;
+			if (!RefProp) continue;
+			// 在 struct element 中查找匹配字段并写入指针
+			UScriptStruct* StructClass = CastField<FStructProperty>(ArrProp->Inner) ? CastField<FStructProperty>(ArrProp->Inner)->Struct : nullptr;
+			if (!StructClass) continue;
+			for (FProperty* Field = StructClass->PropertyLink; Field; Field = Field->PropertyLinkNext)
+			{
+				if (Field->GetName() != Override.Key) continue;
+				void* FieldAddr = Field->ContainerPtrToValuePtr<void>(Elem);
+				if (FObjectProperty* ObjProp = CastField<FObjectProperty>(Field))
+				{ ObjProp->SetObjectPropertyValue(FieldAddr, FindFirstObject<UObject>(*ClassPath, EFindFirstObjectOptions::None, ELogVerbosity::NoLogging)); }
+				else if (CastField<FFieldPathProperty>(Field))
+				{ *static_cast<FFieldPath*>(FieldAddr) = FFieldPath(RefProp); }
+				else if (FStructProperty* StructProp = CastField<FStructProperty>(Field))
+				{
+					UE_LOG(LogMCPBPUtil, Warning, TEXT("field_override: ENTER struct '%s' for key '%s'"), *StructProp->Struct->GetName(), *Override.Key);
+					for (TFieldIterator<FProperty> InnerIt(StructProp->Struct); InnerIt; ++InnerIt)
+					{
+						FProperty* InnerProp = *InnerIt;
+						UE_LOG(LogMCPBPUtil, Warning, TEXT("field_override:   inner field '%s' class='%s'"), *InnerProp->GetName(), *InnerProp->GetClass()->GetName());
+						if (FFieldPathProperty* InnerFP = CastField<FFieldPathProperty>(InnerProp))
+						{
+							UE_LOG(LogMCPBPUtil, Log, TEXT("field_override: matched struct=%s inner=%s ref_prop=%s"), *StructProp->Struct->GetName(), *InnerFP->GetName(), *RefProp->GetName());
+							FFieldPath NewPath(RefProp);
+							*static_cast<FFieldPath*>(InnerFP->ContainerPtrToValuePtr<void>(FieldAddr)) = NewPath;
+						}
+						else if (FStrProperty* InnerStr = CastField<FStrProperty>(InnerProp))
+						{
+							// 同步写入 AttributeName（FGameplayAttribute 在 IsValid()==true 时 GetName() 会 fallback，但写入确保持久化）
+							if (RefProp && InnerStr->GetName() == TEXT("AttributeName"))
+							{ *static_cast<FString*>(InnerProp->ContainerPtrToValuePtr<void>(FieldAddr)) = RefProp->GetName(); }
+						}
+					}
+				}
+				break;
+			}
+		}
+	}
 	FBlueprintEditorUtils::MarkBlueprintAsModified(BP);
 	OutResult = MakeShareable(new FJsonObject()); OutResult->SetStringField(TEXT("asset_path"), AssetPath);
 	OutResult->SetStringField(TEXT("property_name"), PropertyName); OutResult->SetNumberField(TEXT("new_index"), NewIdx); OutResult->SetNumberField(TEXT("new_count"), Helper.Num());
